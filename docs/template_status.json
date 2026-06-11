@@ -1,0 +1,10 @@
+{
+  "official_author_guide": "https://iclr.cc/Conferences/2026/AuthorGuide",
+  "template_url": "https://github.com/ICLR/Master-Template/raw/master/iclr2026.zip",
+  "downloaded": true,
+  "extracted": [
+    "iclr2026_conference.bst",
+    "iclr2026_conference.sty"
+  ],
+  "warnings": []
+}
