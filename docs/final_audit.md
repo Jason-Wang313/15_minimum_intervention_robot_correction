@@ -11,5 +11,5 @@
 9. Biggest weaknesses: simulated evidence only, finite future-context set, Euclidean correction cost, local linearization, and no real robot hardware contact study.
 10. Paper-readiness judgment: revise / strong workshop. The paper is coherent and runnable, but should be strengthened with hardware or a richer robot planner before a main-conference submission.
 11. Exact Downloads PDF path: C:/Users/wangz/Downloads/15.pdf (exists)
-12. GitHub URL: https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction (parent recovery publishing)
+12. GitHub URL: https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction (pushed by parent recovery; commit 6270272)
 13. Desktop copy status: copied by parent recovery to C:\Users\wangz\OneDrive\Desktop\15.pdf
