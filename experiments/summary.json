@@ -1,0 +1,42 @@
+{
+  "UBC": {
+    "future_success_all": 0.7733333333333333,
+    "future_success_reachable": 1.0,
+    "current_success_reachable": 1.0,
+    "detects_unreachable": 1.0,
+    "mean_norm_reachable": 0.6167918596604196,
+    "mean_norm_successful": 0.6167918596604196
+  },
+  "current_only": {
+    "future_success_all": 0.0,
+    "future_success_reachable": 0.0,
+    "current_success_reachable": 1.0,
+    "detects_unreachable": 0.0,
+    "mean_norm_reachable": 0.2932246127906934,
+    "mean_norm_successful": NaN
+  },
+  "gradient_line_search": {
+    "future_success_all": 0.495,
+    "future_success_reachable": 0.6400862068965517,
+    "current_success_reachable": 0.9375,
+    "detects_unreachable": 1.0,
+    "mean_norm_reachable": 1.731707974137931,
+    "mean_norm_successful": 1.018560606060606
+  },
+  "one_axis_current": {
+    "future_success_all": 0.005,
+    "future_success_reachable": 0.00646551724137931,
+    "current_success_reachable": 1.0,
+    "detects_unreachable": 0.0,
+    "mean_norm_reachable": 0.3468280718043114,
+    "mean_norm_successful": 0.4634642907771924
+  },
+  "random_search": {
+    "future_success_all": 0.7733333333333333,
+    "future_success_reachable": 1.0,
+    "current_success_reachable": 1.0,
+    "detects_unreachable": 1.0,
+    "mean_norm_reachable": 1.1738539723613781,
+    "mean_norm_successful": 1.1738539723613781
+  }
+}

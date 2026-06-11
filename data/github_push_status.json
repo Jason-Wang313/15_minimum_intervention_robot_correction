@@ -1,0 +1,11 @@
+{
+  "paper": 15,
+  "repo_url": "https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction",
+  "remote": "https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction.git",
+  "pushed": false,
+  "recovery": "parent",
+  "commit": "pending recovery commit",
+  "pdf_path": "C:/Users/wangz/Downloads/15.pdf",
+  "desktop_pdf": "C:/Users/wangz/OneDrive/Desktop/15.pdf",
+  "notes": "Child attempts produced the PDF but exited during publication; parent recovery is publishing the repo package."
+}
