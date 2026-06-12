@@ -27,6 +27,14 @@ pdflatex -interaction=nonstopmode -halt-on-error main.tex
 
 The final orchestrated PDF target is `C:/Users/wangz/Downloads/15.pdf`.
 
+## Submission-Hardening v2
+
+- Added estimated-update-channel stress in `experiments/channel_noise_stress.csv`.
+- The original 600-trial synthetic result is retained: UBC succeeds on 1.000 of reachable trials and detects 1.000 of unreachable trials under the trusted local channel.
+- With noisy channel estimates, unguarded UBC success drops to 0.330 at sigma 0.10 and 0.260 at sigma 0.20.
+- A simple guarded variant improves sigma 0.10 success to 0.750 and sigma 0.20 success to 0.600, but it gives up the exact minimum-correction interpretation.
+- Decision remains workshop-only until validated with learned update Jacobians, hardware corrections, and richer future-context sets.
+
 ## Key artifacts
 
 - `docs/related_work_matrix.csv`: 1000-paper landscape matrix.
