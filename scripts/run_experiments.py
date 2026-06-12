@@ -15,10 +15,12 @@ DOCS = ROOT / "docs"
 
 RESULTS_CSV = EXP_DIR / "episode_results.csv"
 SUMMARY_JSON = EXP_DIR / "summary.json"
+CHANNEL_STRESS_CSV = EXP_DIR / "channel_noise_stress.csv"
+CHANNEL_STRESS_TEX = EXP_DIR / "channel_noise_table.tex"
 EVIDENCE_MD = DOCS / "evidence_summary.md"
 
 
-def min_norm_halfspace(H: np.ndarray, h: np.ndarray, tol: float = 1e-8) -> Tuple[Optional[np.ndarray], str]:
+def min_norm_halfspace(H: np.ndarray, h: np.ndarray, tol: float = 1e-8, use_scipy: bool = False) -> Tuple[Optional[np.ndarray], str]:
     """Solve min ||c||_2 subject to H c >= h by active-set enumeration.
 
     The correction dimension is small in this experiment. At the Euclidean projection
@@ -54,21 +56,19 @@ def min_norm_halfspace(H: np.ndarray, h: np.ndarray, tol: float = 1e-8) -> Tuple
     if best is not None:
         return best, best_status
 
-    # Numerical fallback for rare degenerate active sets. The experiment does not
-    # depend on SciPy for the usual path, but the package is available in the
-    # batch environment and keeps the generated labels honest.
-    try:
-        from scipy.optimize import minimize
+    if use_scipy:
+        try:
+            from scipy.optimize import minimize
 
-        def obj(x: np.ndarray) -> float:
-            return 0.5 * float(x @ x)
+            def obj(x: np.ndarray) -> float:
+                return 0.5 * float(x @ x)
 
-        constraints = [{"type": "ineq", "fun": lambda x, row=row, rhs=rhs: float(row @ x - rhs)} for row, rhs in zip(H, h)]
-        result = minimize(obj, np.zeros(d), method="SLSQP", constraints=constraints, options={"maxiter": 300, "ftol": 1e-10})
-        if result.success and np.all(H @ result.x >= h - 1e-6):
-            return np.asarray(result.x), "optimal_slsqp"
-    except Exception:
-        pass
+            constraints = [{"type": "ineq", "fun": lambda x, row=row, rhs=rhs: float(row @ x - rhs)} for row, rhs in zip(H, h)]
+            result = minimize(obj, np.zeros(d), method="SLSQP", constraints=constraints, options={"maxiter": 300, "ftol": 1e-10})
+            if result.success and np.all(H @ result.x >= h - 1e-6):
+                return np.asarray(result.x), "optimal_slsqp"
+        except Exception:
+            pass
     return best, best_status
 
 
@@ -235,6 +235,58 @@ def run(seed: int = 15, n_trials: int = 600, max_norm: float = 3.0) -> List[Dict
     return rows
 
 
+def solve_with_cap(H: np.ndarray, h: np.ndarray, max_norm: float) -> Tuple[Optional[np.ndarray], str]:
+    c, status = min_norm_halfspace(H, h)
+    if c is not None and np.linalg.norm(c) > max_norm:
+        return None, "outside_physical_cap"
+    return c, status
+
+
+def channel_noise_stress(seed: int = 1515, n_trials: int = 100, max_norm: float = 3.0) -> List[Dict[str, float]]:
+    rng = np.random.default_rng(seed)
+    rows: List[Dict[str, float]] = []
+    for sigma in [0.0, 0.02, 0.05, 0.10, 0.20, 0.35]:
+        ubc_success: List[int] = []
+        guarded_success: List[int] = []
+        ubc_norms: List[float] = []
+        guarded_norms: List[float] = []
+        ubc_failure: List[int] = []
+        guarded_failure: List[int] = []
+        for _ in range(n_trials):
+            H_true, h, _ = make_reachable_trial(rng)
+            H_hat = H_true + rng.normal(loc=0.0, scale=sigma, size=H_true.shape)
+
+            c_ubc, ubc_status = solve_with_cap(H_hat, h, max_norm)
+            ubc_eval = evaluate_method("UBC_estimated_channel", c_ubc, ubc_status, H_true, h, True, max_norm)
+            ubc_success.append(int(ubc_eval["future_success"]))
+            ubc_failure.append(int(ubc_status in {"infeasible", "failed", "outside_physical_cap"}))
+            if ubc_eval["future_success"] == 1 and c_ubc is not None:
+                ubc_norms.append(float(np.linalg.norm(c_ubc)))
+
+            # A small uniform guard is a conservative hedge against channel error.
+            guarded_h = h + 0.5 * sigma
+            c_guard, guard_status = solve_with_cap(H_hat, guarded_h, max_norm)
+            guard_eval = evaluate_method("guarded_UBC_estimated_channel", c_guard, guard_status, H_true, h, True, max_norm)
+            guarded_success.append(int(guard_eval["future_success"]))
+            guarded_failure.append(int(guard_status in {"infeasible", "failed", "outside_physical_cap"}))
+            if guard_eval["future_success"] == 1 and c_guard is not None:
+                guarded_norms.append(float(np.linalg.norm(c_guard)))
+
+        rows.append(
+            {
+                "channel_noise_sigma": sigma,
+                "trials": float(n_trials),
+                "ubc_future_success": float(np.mean(ubc_success)),
+                "guarded_future_success": float(np.mean(guarded_success)),
+                "ubc_solver_failure_rate": float(np.mean(ubc_failure)),
+                "guarded_solver_failure_rate": float(np.mean(guarded_failure)),
+                "ubc_mean_norm_successful": float(np.mean(ubc_norms)) if ubc_norms else float("nan"),
+                "guarded_mean_norm_successful": float(np.mean(guarded_norms)) if guarded_norms else float("nan"),
+            }
+        )
+    return rows
+
+
 def write_results(rows: List[Dict[str, object]]) -> Dict[str, Dict[str, float]]:
     EXP_DIR.mkdir(parents=True, exist_ok=True)
     FIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -284,6 +336,33 @@ def write_results(rows: List[Dict[str, object]]) -> Dict[str, Dict[str, float]]:
     return summary
 
 
+def write_channel_stress(rows: List[Dict[str, float]]) -> None:
+    with CHANNEL_STRESS_CSV.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+    selected = [0.0, 0.05, 0.10, 0.20, 0.35]
+    by_sigma = {round(row["channel_noise_sigma"], 2): row for row in rows}
+    lines = [
+        r"\begin{tabular}{lcccc}",
+        r"\toprule",
+        r"Channel noise $\sigma$ & UBC success & Guarded success & UBC norm & Guarded norm \\",
+        r"\midrule",
+    ]
+    for sigma in selected:
+        row = by_sigma[round(sigma, 2)]
+        lines.append(
+            f"{sigma:.2f} & "
+            f"{row['ubc_future_success']:.3f} & "
+            f"{row['guarded_future_success']:.3f} & "
+            f"{row['ubc_mean_norm_successful']:.3f} & "
+            f"{row['guarded_mean_norm_successful']:.3f} \\\\"
+        )
+    lines.extend([r"\bottomrule", r"\end{tabular}", ""])
+    CHANNEL_STRESS_TEX.write_text("\n".join(lines), encoding="utf-8")
+
+
 def plot_summary(summary: Dict[str, Dict[str, float]]) -> None:
     methods = ["UBC", "current_only", "one_axis_current", "gradient_line_search", "random_search"]
     labels = ["UBC", "Current", "Axis", "Gradient", "Random"]
@@ -316,10 +395,18 @@ def plot_summary(summary: Dict[str, Dict[str, float]]) -> None:
     plt.close()
 
 
-def write_evidence_md(summary: Dict[str, Dict[str, float]], rows: List[Dict[str, object]]) -> None:
+def write_evidence_md(
+    summary: Dict[str, Dict[str, float]],
+    rows: List[Dict[str, object]],
+    channel_rows: List[Dict[str, float]],
+) -> None:
     n_trials = len({r["trial"] for r in rows})
     reachable = len({r["trial"] for r in rows if r["reachable"] == 1})
     unreachable = n_trials - reachable
+    channel_by_sigma = {round(row["channel_noise_sigma"], 2): row for row in channel_rows}
+    sigma_10 = channel_by_sigma[0.10]
+    sigma_20 = channel_by_sigma[0.20]
+    sigma_35 = channel_by_sigma[0.35]
     lines = [
         "# Evidence Summary",
         "",
@@ -341,11 +428,15 @@ def write_evidence_md(summary: Dict[str, Dict[str, float]], rows: List[Dict[str,
         "- Current-only corrections usually satisfy the immediate constraint but often fail the future-context set, demonstrating that present repair is not equivalent to future learning.",
         "- UBC succeeds on the reachable local problems because it solves the exact minimum-norm projected halfspace problem.",
         "- Unreachable trials contain contradictory future margins in the physical correction channel; UBC returns an infeasibility certificate rather than pretending a larger correction would help.",
+        f"- V2 channel-noise stress: when UBC solves with a noisy update channel and is evaluated on the true margins, success drops from 1.000 at sigma 0.00 to {sigma_10['ubc_future_success']:.3f} at sigma 0.10, {sigma_20['ubc_future_success']:.3f} at sigma 0.20, and {sigma_35['ubc_future_success']:.3f} at sigma 0.35.",
+        f"- A simple guarded variant improves the sigma 0.20 stress to {sigma_20['guarded_future_success']:.3f} but increases mean successful norm to {sigma_20['guarded_mean_norm_successful']:.3f}; the certificate is therefore only as good as the estimated update channel.",
         "- The evidence is simulated and local. It supports the formal mechanism, not a hardware or global nonlinear claim.",
         "",
         "Generated artifacts:",
         "- `experiments/episode_results.csv`",
         "- `experiments/summary.json`",
+        "- `experiments/channel_noise_stress.csv`",
+        "- `experiments/channel_noise_table.tex`",
         "- `figures/success_rates.png`",
         "- `figures/correction_norms.png`",
     ]
@@ -355,8 +446,10 @@ def write_evidence_md(summary: Dict[str, Dict[str, float]], rows: List[Dict[str,
 def main() -> None:
     rows = run()
     summary = write_results(rows)
+    channel_rows = channel_noise_stress()
+    write_channel_stress(channel_rows)
     plot_summary(summary)
-    write_evidence_md(summary, rows)
+    write_evidence_md(summary, rows, channel_rows)
     print(json.dumps(summary, indent=2))
 
 

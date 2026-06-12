@@ -18,9 +18,17 @@
 
 \begin{document}
 \maketitle
+\noindent\textbf{Submission-hardening v2, 2026-06-13.}
+Added estimated-update-channel stress tests. The certificate is now framed as
+exact only for a trusted local update map; with a noisy estimated channel, the
+returned correction must be treated as a fragile local recommendation.
 
 \begin{abstract}
 Physical corrections are a natural way to teach robots, but a correction that repairs the current execution can still be invisible to the learner that determines future behavior. We formalize a \emph{Minimum Effective Correction}: the smallest physical intervention whose image through the robot's update rule crosses a specified future-behavior boundary. The resulting mechanism, Update-Boundary Correction (UBC), solves a local minimum-norm halfspace problem and returns either a correction, a nullspace warning, or an infeasibility certificate for the robot's current correction channel. In a controlled embodied-correction simulator, UBC succeeds on reachable future-behavior constraints while current-only corrections often repair the immediate margin without changing future behavior. The claims are intentionally local: the paper proves the certificate for affine update linearizations and reports simulated evidence, not a global or hardware guarantee.
+A v2 stress test makes the main boundary explicit: when UBC solves with an estimated
+update channel but is evaluated on the true margins, success falls to 0.330 at
+channel-noise $\sigma=0.10$; a guarded variant recovers 0.750 success at larger
+correction norm.
 \end{abstract}
 
 \section{Introduction}
@@ -109,6 +117,14 @@ Random search & 100.0 & 100.0 & 1.174 \\
 \label{tab:results}
 \end{table}
 
+\begin{table}[t]
+\centering
+\caption{V2 estimated-channel stress. UBC and guarded UBC solve with a noisy
+estimated update channel $\hat H$ and are evaluated on the true future margins.}
+\label{tab:channel-noise}
+\input{../experiments/channel_noise_table.tex}
+\end{table}
+
 \begin{figure}[t]
 \centering
 \begin{minipage}{0.48\linewidth}
@@ -125,8 +141,19 @@ Random search & 100.0 & 100.0 & 1.174 \\
 
 The result is the intended stress test. Current-only corrections can satisfy the immediate margin while failing the future-context set. UBC succeeds on reachable local problems because it solves the exact projected halfspace problem; on contradictory problems it reports infeasibility. This is not evidence that UBC is a complete robot teacher. It is evidence that the distinction between current repair and future-behavior change is operational and measurable.
 
+Table~\ref{tab:channel-noise} attacks the strongest hidden assumption: the robot must
+know the local update channel. If UBC optimizes against $\hat H=H+\eta$ but the true
+future margins are checked under $H$, the tight minimum-norm certificate becomes brittle.
+At $\sigma=0.10$, unguarded success is 0.330. Adding a small uniform margin guard raises
+success to 0.750, but it changes the object from minimum correction to a more conservative
+correction. Thus UBC is exact for the modeled channel, not automatically robust to
+Jacobian-estimation error.
+
 \section{Limitations}
 The guarantee is local to the affine update and linearized future-margin model. The finite context set $\mathcal{Z}$ is chosen by the designer and may miss deployment cases. The correction cost is Euclidean in the simulator rather than biomechanical. The experiments are abstract and do not include hardware contact, tactile sensing, or a high-dimensional policy. These limitations are central to the paper's honest scope: MEC is a formal object and UBC is a local certificate, not a universal account of human teaching.
+The v2 estimated-channel stress adds a sharper boundary: if the update Jacobian is noisy,
+the exact local certificate can fail on the true margins unless extra guard margins or
+online validation are added.
 
 \section{Conclusion}
 Physical correction papers often conflate immediate repair with future robot learning. Minimum Effective Correction separates them. By projecting physical effort through the robot's update channel, UBC identifies the smallest correction that can change future behavior under a local model, and it exposes when the interface cannot provide such a correction. The mechanism is small, but the shift is sharp: the central question becomes not only what the human intended, but what the robot learner can actually absorb.

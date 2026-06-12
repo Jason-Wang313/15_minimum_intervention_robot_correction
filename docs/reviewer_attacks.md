@@ -16,3 +16,7 @@
 - Present infeasibility as a diagnostic of the robot's correction interface, not a claim about human intent.
 - Emphasize the mechanism shift: physical correction is evaluated through update reachability.
 - Keep unsupported claims out of the abstract and conclusion.
+
+## V2 channel-estimation rebuttal
+
+The hardening pass adds the missing stress. UBC remains exact when the modeled channel is trusted, but if it solves with a noisy estimated channel and the true margins are evaluated under the original channel, success drops sharply: 0.330 at sigma 0.10 and 0.260 at sigma 0.20. A guarded variant recovers 0.750 and 0.600 success respectively, but this is no longer the exact minimum correction. The paper now frames Jacobian estimation as a core deployment blocker, not an implementation detail.

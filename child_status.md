@@ -23,3 +23,16 @@ Recovery steps:
 
 Next:
 - Patch the batch queue and continue Paper 16 monitoring.
+
+## Submission-hardening v2 terminal status
+
+Checked: 2026-06-13 00:16:16 +01:00
+
+- Added estimated-update-channel stress for noisy `H_hat` evaluated against true future margins.
+- Trusted-channel UBC result retained: reachable future success 1.000 and unreachable detection 1.000.
+- Unguarded UBC under channel noise: success 0.330 at sigma 0.10 and 0.260 at sigma 0.20.
+- Guarded UBC under channel noise: success 0.750 at sigma 0.10 and 0.600 at sigma 0.20, at larger correction norms.
+- Rebuilt the manuscript and copied the canonical v2 PDF to `C:/Users/wangz/Downloads/15.pdf` (263,370 bytes).
+- Local `paper/main.pdf` was removed after the canonical copy.
+- Terminal decision: workshop-only / revise before main-conference submission.
+- No new Desktop copy created during v2 hardening.
