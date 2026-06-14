@@ -1,38 +1,29 @@
 # Child Status
 
-Stage: parent recovery published
+- Paper: 15, `minimum_intervention_robot_correction`
+- Stage: v3 full-scale hardening complete pending commit/push
+- Workspace: `C:\Users\wangz\robotics_60_paper_batch\15_minimum_intervention_robot_correction`
+- Required final PDF path: `C:/Users/wangz/Downloads/15.pdf`
+- GitHub repository: `https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction`
 
-Completed:
-- Literature matrix and synthesis artifacts exist, including the 1000-row related-work matrix.
-- Experiments were rerun and `experiments/summary.json` supports the UBC evidence table.
-- The ICLR-style PDF was built and copied to `C:/Users/wangz/Downloads/15.pdf`.
-- The numbered PDF was copied visibly to `C:/Users/wangz/OneDrive/Desktop/15.pdf`.
-- Parent recovery refreshed `docs/final_audit.md` with the actual evidence and publication status.
-- Parent recovery pushed the repository at commit `6270272`.
+## Current Facts
 
-Current or recent commands:
-- `python scripts/finalize_audit.py --github-url https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction ...`
+- The old canonical artifact was a 5-page v2 paper and is stale under the current 25-page internal standard.
+- `docs/full_scale_execution_plan.md` was written before the v3 pass.
+- `experiments/full_scale_minimum_intervention.py` completed eight full-scale experiment families sequentially.
+- `results/full_scale/progress.json` reports stage `complete`.
+- Seed-row summaries: A 864, B 648, C 270, D 120, E 84, F 144, G 200, H 96.
+- Plot failures: 0.
+- Total v3 seed-row summaries: 2,426.
+- Main context setting: UBC future success 1.000, current-only future success 0.000, random-search norm ratio 2.259.
+- Estimated channel stress at sigma 0.10: unguarded success 0.344, guard-1.0 success 0.906.
+- Nonlinear curvature 0.20: raw linear UBC success 0.000, trust-recentered success 0.817.
+- Final manuscript compiled successfully to 25 pages and 414,131 bytes.
+- The final verified PDF was copied to `C:/Users/wangz/Downloads/15.pdf`.
+- Downloads `15.pdf` SHA256: `A3C35CED8E413B92C2DE1C58B54265EB3EBFCE4A46420AE65A23C31EAB2F66B9`.
+- Local `paper/main.pdf` was removed after final copy.
+- Final log scan found no unresolved citations, undefined references, LaTeX errors, fatal stops, missing files, or overfull boxes; only benign underfull warnings and the MiKTeX update reminder remain.
 
-Failures:
-- Child attempts exited 999 after PDF generation during the publish/final-audit phase.
-- Semantic Scholar optional 429 remains documented from the literature stage.
+## Next
 
-Recovery steps:
-- Parent recovery is committing and pushing the repository package directly.
-- Queue row 15 will be restored to `SUCCESS` now that the push is verified.
-
-Next:
-- Patch the batch queue and continue Paper 16 monitoring.
-
-## Submission-hardening v2 terminal status
-
-Checked: 2026-06-13 00:16:16 +01:00
-
-- Added estimated-update-channel stress for noisy `H_hat` evaluated against true future margins.
-- Trusted-channel UBC result retained: reachable future success 1.000 and unreachable detection 1.000.
-- Unguarded UBC under channel noise: success 0.330 at sigma 0.10 and 0.260 at sigma 0.20.
-- Guarded UBC under channel noise: success 0.750 at sigma 0.10 and 0.600 at sigma 0.20, at larger correction norms.
-- Rebuilt the manuscript and copied the canonical v2 PDF to `C:/Users/wangz/Downloads/15.pdf` (263,370 bytes).
-- Local `paper/main.pdf` was removed after the canonical copy.
-- Terminal decision: workshop-only / revise before main-conference submission.
-- No new Desktop copy created during v2 hardening.
+- Commit, push, and verify `HEAD` equals upstream before starting Paper 16.

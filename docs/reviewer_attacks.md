@@ -1,22 +1,45 @@
 # Reviewer Attacks
 
-1. The method is only a local linearization; nonlinear robot learners may invalidate the certificate far from the correction point.
-2. The future contexts are selected by the experimenter, so the guarantee is conditional on a finite evaluation set.
-3. The simulation is abstract and does not yet show a real manipulator receiving physical corrections.
-4. Some prior work in reward learning from physical corrections may be framed as implicitly crossing behavior boundaries.
-5. Estimating the update Jacobian on a real robot could be noisy or expensive.
-6. The min-norm objective may not match human biomechanics or comfort.
-7. The infeasibility certificate depends on the chosen learner, not on the task's true learnability.
-8. Baselines may be weaker than the strongest modern preference or correction learner.
-9. The paper needs clearer separation between immediate trajectory repair and future policy change.
-10. Without hardware, the work may be better suited to a workshop unless the formal framing is persuasive.
+## Attack 1: This is only a local linearization.
 
-## Planned rebuttal posture
-- Be explicit that the guarantee is local and learner-relative.
-- Present infeasibility as a diagnostic of the robot's correction interface, not a claim about human intent.
-- Emphasize the mechanism shift: physical correction is evaluated through update reachability.
-- Keep unsupported claims out of the abstract and conclusion.
+Response: Correct. The claim is local. Family C stresses nonlinear curvature: raw linear UBC has 0.000 success at curvature 0.20, while trust-recentered UBC reaches 0.817. The manuscript states that local validation is required.
 
-## V2 channel-estimation rebuttal
+## Attack 2: The update channel may be unknown or noisy.
 
-The hardening pass adds the missing stress. UBC remains exact when the modeled channel is trusted, but if it solves with a noisy estimated channel and the true margins are evaluated under the original channel, success drops sharply: 0.330 at sigma 0.10 and 0.260 at sigma 0.20. A guarded variant recovers 0.750 and 0.600 success respectively, but this is no longer the exact minimum correction. The paper now frames Jacobian estimation as a core deployment blocker, not an implementation detail.
+Response: Correct and central. Family B evaluates estimated channels. At sigma 0.10, unguarded success is 0.344 and guard-1.0 success is 0.906 at larger norm. The paper does not claim robustness without guard margins or validation.
+
+## Attack 3: Future contexts are designer-selected.
+
+Response: Correct. The guarantee is conditional on the finite context set. Family H shows that removing future contexts or using random contexts collapses the mechanism. The manuscript calls context selection a deployment requirement.
+
+## Attack 4: There is no hardware.
+
+Response: Correct. The v3 paper is a mechanism/counterexample paper, not a real-robot systems result.
+
+## Attack 5: Stronger correction-learning baselines might close the gap.
+
+Response: Partially addressed. Family E includes reward-gradient, coactive direction, margin penalty, safe guard, robust UBC, and sequential greedy baselines. UBC success is 1.000; margin-penalty success is 0.007. Guarded methods can match success at larger norm.
+
+## Attack 6: Minimum Euclidean norm is not human effort.
+
+Response: Correct. Family D evaluates anisotropic force, joint-limited, comfort-weighted, and sparse-contact costs. The manuscript defines MEC with a positive definite cost matrix `W`.
+
+## Attack 7: Infeasibility may be a model artifact.
+
+Response: It is explicitly learner-relative. An infeasibility certificate means the current channel cannot certify the requested future margins, not that the task is impossible for all interfaces.
+
+## Attack 8: Nullspace warnings are abstract.
+
+Response: Family F measures nullspace effort directly, and Family G includes force/tactile and peg-compliance synthetic tasks where low-rank channels are structurally plausible.
+
+## Attack 9: The title suggests future robot behavior but the evidence is synthetic.
+
+Response: The title is acceptable only under the local mechanism scope. The abstract and limitations state that there is no hardware or learned high-dimensional policy.
+
+## Numeric Stress Points
+
+- Main setting: UBC future success 1.000, current-only future success 0.000.
+- Random-search norm ratio: 2.259.
+- Estimated-channel sigma 0.10: unguarded success 0.344, guard-1.0 success 0.906.
+- Nonlinear curvature 0.20: raw linear UBC success 0.000, trust-recentered success 0.817.
+- Ablation: full UBC success 1.000, no-future-context success 0.008.

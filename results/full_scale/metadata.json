@@ -1,0 +1,36 @@
+{
+  "master_seed": 15015,
+  "families": [
+    "future_context_coverage",
+    "estimated_update_channel",
+    "nonlinear_locality",
+    "interface_cost",
+    "strong_baselines",
+    "infeasibility_nullspace",
+    "embodied_synthetic_tasks",
+    "ablation"
+  ],
+  "headline": {
+    "ubc_success": 1.0,
+    "current_success": 0.0,
+    "random_norm_ratio": 2.258702603702566,
+    "estimated_sigma_010": 0.34375,
+    "guard_sigma_010": 0.90625,
+    "nonlinear_linear_020": 0.0,
+    "nonlinear_trust_020": 0.8166666666666665,
+    "baseline_ubc": 1.0,
+    "baseline_margin_penalty": 0.006944444444444444,
+    "ablation_full": 1.0,
+    "ablation_no_future": 0.008333333333333333
+  },
+  "seed_rows": {
+    "A": 864,
+    "B": 648,
+    "C": 270,
+    "D": 120,
+    "E": 84,
+    "F": 144,
+    "G": 200,
+    "H": 96
+  }
+}

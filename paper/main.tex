@@ -15,170 +15,1372 @@
 
 \newtheorem{proposition}{Proposition}
 \newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\mec}{\mathrm{MEC}}
+\newcommand{\ubc}{\mathrm{UBC}}
+\newcommand{\noop}{\mathrm{noop}}
 
 \begin{document}
 \maketitle
-\noindent\textbf{Submission-hardening version: v2, 2026-06-13.}
-Added estimated-update-channel stress tests. The certificate is now framed as
-exact only for a trusted local update map; with a noisy estimated channel, the
-returned correction must be treated as a fragile local recommendation.
+
+\noindent\textbf{Submission-hardening version: v3, 2026-06-14.}
+This version replaces the five-page v2 local certificate paper with a full-scale
+mechanism paper. It adds eight experiment families, 2,426 seed-row summaries,
+stronger baselines, channel-estimation stresses, nonlinear locality stresses,
+interface-cost studies, infeasibility/nullspace diagnostics, manipulator-inspired
+synthetic tasks, generated figures and tables, proof details, and a complete
+artifact audit. The claim remains deliberately scoped: the paper validates a
+local estimand and diagnostic, not a hardware robot teacher.
 
 \begin{abstract}
-Physical corrections are a natural way to teach robots, but a correction that repairs the current execution can still be invisible to the learner that determines future behavior. We formalize a \emph{Minimum Effective Correction}: the smallest physical intervention whose image through the robot's update rule crosses a specified future-behavior boundary. The resulting mechanism, Update-Boundary Correction (UBC), solves a local minimum-norm halfspace problem and returns either a correction, a nullspace warning, or an infeasibility certificate for the robot's current correction channel. In a controlled embodied-correction simulator, UBC succeeds on reachable future-behavior constraints while current-only corrections often repair the immediate margin without changing future behavior. The claims are intentionally local: the paper proves the certificate for affine update linearizations and reports simulated evidence, not a global or hardware guarantee.
-A v2 stress test makes the main boundary explicit: when UBC solves with an estimated
-update channel but is evaluated on the true margins, success falls to 0.330 at
-channel-noise $\sigma=0.10$; a guarded variant recovers 0.750 success at larger
-correction norm.
+Physical corrections are a natural way to teach robots, but a correction that
+repairs the current execution can still be invisible to the learner that
+determines future behavior. We formalize a \emph{Minimum Effective Correction}:
+the minimum-cost physical intervention whose image through the robot learner's
+update channel crosses specified future-behavior boundaries. The resulting
+mechanism, Update-Boundary Correction (UBC), solves a local minimum-norm
+halfspace problem and returns either a correction, a nullspace warning, or an
+infeasibility certificate for the robot's current correction interface. In a
+full-scale synthetic suite with eight experiment families and 2,426 seed-row
+summaries, UBC obtains 1.000 reachable future success in the main context
+coverage setting while current-only correction obtains 0.000; random feasible
+search approaches the success rate but uses 2.259 times the physical norm. The
+same suite exposes the boundary conditions: at channel-noise $\sigma=0.10$,
+unguarded estimated-channel UBC succeeds in 0.344 of reachable cases, while a
+guarded variant reaches 0.906 at larger norm; under nonlinear curvature 0.20,
+the raw linear certificate has 0.000 true success whereas a trust-recentered
+variant reaches 0.817. The evidence supports a mechanism claim: corrections
+should be minimized after projection through the learner's update channel. It
+does not claim hardware validation, global nonlinear optimality, or solved
+human-intent inference.
 \end{abstract}
 
 \section{Introduction}
-Robots are often corrected physically: a person nudges a manipulator away from an obstacle, guides a waypoint through a safer passage, or takes over a shared-control interface. Prior work shows that such feedback can teach demonstrations, rewards, preferences, and policies \citep{argall2009survey,chernova2014robot,bajcsy2017learning,sadigh2017active,ross2011dagger,kelly2019hgdagger}. Yet these methods usually ask what the human meant, not whether the physical input lies in a part of the robot update map that can change future autonomous behavior.
 
-This distinction matters because robot correction has two faces. One face is immediate compliance: the robot's current motion changes because a human applied force or selected an alternative command. The other is learning: future trajectories change after the contact ends. These can disagree. A small push can fix the present motion while falling in the learner's nullspace; a larger but differently directed correction can be the true minimum that changes future behavior.
+Robots are often corrected physically. A person nudges an arm away from an
+obstacle, drags a waypoint to a safer side of a table, resists a gripper closing
+too early, or takes over a shared-control interface for one segment of motion.
+These interventions have immediate mechanical effects, and they can also be used
+as learning signals. Prior work has shown how demonstrations, corrections,
+preferences, interventions, and shared-control signals can train policies,
+rewards, objectives, and assistive controllers
+\citep{argall2009survey,chernova2014robot,bajcsy2017learning,bajcsy2018learning,
+sadigh2017active,ross2011dagger,kelly2019hgdagger}. Yet a subtle gap remains:
+the physical correction that looks smallest or most direct in the current
+trajectory need not be the smallest correction that the robot learner will
+absorb into future behavior.
 
-This paper studies the object suggested by that disagreement. Given a robot learner, a correction interface, and a finite set of future behavior predicates, what is the smallest physical correction that changes the future policy? The answer is not generally the smallest geometric trajectory deformation. It is the smallest correction after projection through the robot's update channel.
+The distinction is not semantic. Suppose the learner updates parameters
+$\theta$ by projecting a correction $c$ through a local update channel $J$.
+Future behavior is then measured by margins $m_j(\theta+Jc)$ over future
+contexts $z_j$. A correction can be visually salient and still lie in the
+nullspace of the composed map from physical effort to future margins. Conversely,
+a correction that looks larger in the current state can be the smallest one that
+crosses a future decision boundary. Human effort is spent in physical space, but
+future learning happens after a robot-specific projection.
 
-\textbf{Contributions.} We make three contributions. First, we define the Minimum Effective Correction (MEC), a learner-relative object that distinguishes behavior-changing corrections from compliance-only motion. Second, we derive Update-Boundary Correction (UBC), a local convex certificate for affine update models and linearized future-behavior margins. Third, we provide runnable evidence showing that immediate repair can fail to produce future behavior change, while UBC either finds the minimum correction in the reachable channel or declares the request unreachable.
+This paper studies that projection as the main object. We ask: given a robot
+learner, a physical correction interface, and a finite set of future behavior
+predicates, what is the smallest physical intervention that changes future
+autonomous behavior? The answer is the \emph{Minimum Effective Correction}
+(MEC). MEC is not the smallest displacement that repairs the present motion. It
+is the smallest correction that is effective under the robot's own update map.
+
+The operational method is Update-Boundary Correction (UBC). In the local affine
+case, UBC solves a minimum-norm halfspace problem,
+\begin{equation}
+    c^\star = \arg\min_c \|c\|_W^2
+    \quad\textrm{s.t.}\quad Hc \ge h,
+    \label{eq:intro-ubc}
+\end{equation}
+where $H$ is the composed future-margin/update channel and $h$ is the vector of
+required future margin deficits. When the feasible set is nonempty, UBC returns
+the minimum-cost physical correction for the modeled channel. When the set is
+empty, the current interface cannot certify the desired future behavior. When
+the channel has nullspace, physical effort can alter current compliance while
+leaving all certified future margins unchanged.
+
+\paragraph{Why another correction paper?}
+The closest correction and preference-learning papers ask what the human wants
+or how to update a reward from interaction. This paper asks a different
+diagnostic question: can this physical correction channel move the learner
+across the future boundaries we care about? That question is useful even when a
+downstream reward learner is sophisticated, because the physical signal can be
+filtered through features, tactile channels, shared-autonomy arbitration,
+demonstration buffers, or policy-update rules before it affects future actions.
+
+\paragraph{Contributions.}
+First, we define Minimum Effective Correction as a learner-relative object, not a
+geometric trajectory edit. Second, we derive UBC, including weighted effort,
+infeasibility, nullspace, channel-error, and local nonlinear variants. Third, we
+provide a full-scale synthetic evidence package with eight experiment families:
+future-context coverage, estimated update-channel stress, nonlinear locality,
+interface cost, stronger baselines, infeasibility/nullspace diagnostics,
+manipulator-inspired synthetic tasks, and ablations. Fourth, we report honest
+failure boundaries. UBC is exact only for the modeled local channel; noisy
+Jacobian estimates, missing future contexts, wrong cost metrics, and nonlinear
+curvature can all break the certificate.
 
 \section{Related Work}
-\textbf{Learning from demonstration and correction.} Learning from demonstration converts human traces into policies or trajectory models \citep{argall2009survey,akgun2012keyframe,chernova2014robot}. Physical correction methods go further by treating corrective interaction as information about missing reward features or desired behavior \citep{bajcsy2017learning,bajcsy2018learning,bobu2020feature}. Our work does not claim novelty in using corrections as feedback. Instead, it asks whether a physical correction is effective under the learner's own update channel.
 
-\textbf{Preferences and coactive improvement.} Preference-based and coactive methods use comparisons or improvements to infer reward functions \citep{jain2015learning,sadigh2017active,wirth2017survey,christiano2017deep}. They reduce the burden of full demonstrations, but the feedback object is usually a label or ranking. MEC is different: the optimization variable is the physical intervention itself, with cost measured before the learner projects it into parameter space.
+\paragraph{Learning from demonstration and correction.}
+Learning from demonstration converts human traces into policies, trajectory
+models, keyframes, or reward-like objectives
+\citep{argall2009survey,akgun2012keyframe,chernova2014robot}. Physical
+correction methods use human interaction as richer feedback about what the robot
+should do next \citep{bajcsy2017learning,bajcsy2018learning,bobu2020feature}.
+This paper does not claim novelty in using physical corrections as feedback. It
+instead separates two questions that are often coupled: whether a correction
+fixes the current behavior, and whether the robot's update rule can convert that
+correction into future behavior change.
 
-\textbf{Shared autonomy and intervention-aided learning.} Shared autonomy blends human commands with autonomous inference \citep{javdani2015shared,losey2018review}. Intervention-aided imitation learning treats takeovers as corrective data \citep{ross2011dagger,kelly2019hgdagger}. These settings reveal the same risk: successful assistance or safe takeover does not prove that future autonomous behavior has changed. UBC targets that gap directly.
+\paragraph{Preferences, coactive learning, and value alignment.}
+Preference-based and coactive methods use rankings or improvements to infer
+reward functions \citep{jain2015learning,sadigh2017active,wirth2017survey,
+christiano2017deep}. Cooperative and pragmatic value-alignment approaches model
+the interaction between human and robot as informative behavior
+\citep{hadfieldmenell2016cirL,fisac2017pragmatic}. MEC is compatible with these
+methods but lives at a lower interface layer. If a physical correction is mapped
+into reward or policy parameters through some update channel, then MEC asks which
+physical correction crosses a future boundary after that projection.
 
-\textbf{Minimum intervention.} The minimum intervention principle in motor control emphasizes corrections only along task-relevant dimensions \citep{todorov2004optimality}. We borrow the spirit but change the object: the relevant dimensions are not only task-state dimensions, but the image of the robot's learning update map.
+\paragraph{Shared autonomy and intervention learning.}
+Shared autonomy blends human commands with robot inference
+\citep{javdani2015shared,losey2018review}. Intervention-aided imitation learning
+uses takeovers or corrections as data \citep{ross2011dagger,kelly2019hgdagger}.
+These systems motivate the present diagnostic: an intervention can be helpful in
+the moment while remaining weak or ambiguous as a future training signal. UBC is
+not an autonomy arbitration policy; it is a certificate for the future effect of
+a correction under a local update model.
 
-\section{Minimum Effective Correction}
-Let $\theta \in \mathbb{R}^p$ denote the robot learner state, such as reward weights, planner parameters, or policy features. A physical correction $c \in \mathbb{R}^d$ is applied during an interaction $\tau$. The robot update is
+\paragraph{Minimum intervention and task relevance.}
+The minimum intervention principle in motor control emphasizes correcting only
+task-relevant dimensions \citep{todorov2004optimality}. We borrow the spirit but
+change the relevant space. Task relevance is not just a property of the current
+state; it is filtered by the learner. A correction dimension is future-relevant
+only if it survives the composed update channel into future margins.
+
+\paragraph{Boundary to prior robot correction work.}
+Prior work can be very close if it explicitly identifies the map from physical
+correction to future behavior and optimizes correction effort through that map.
+The novelty here is not the optimizer alone. The core novelty is the estimand:
+minimum physical effort after projection through the update channel, with
+infeasibility and nullspace treated as first-class diagnostic outputs.
+
+\section{Problem Formulation}
+
+Let $\theta\in\R^p$ denote the learner state: reward weights, policy features,
+planner parameters, latent preferences, or another internal object. During an
+interaction trajectory $\tau$, the human applies a physical correction
+$c\in\R^d$. The robot update is
 \begin{equation}
     \theta^+ = U(\theta,\tau,c).
 \end{equation}
-For future contexts $z_j$, define behavior margins $m_j(\theta^+)$. The desired future behavior is certified when $m_j(\theta^+) \geq \gamma$ for all $j$ in a finite set $\mathcal{Z}$.
+For a finite future context set $\mathcal{Z}=\{z_j\}_{j=1}^k$, define margins
+$m_j(\theta^+)$ where $m_j(\theta^+)\ge \gamma$ means that the updated robot
+passes the desired future predicate in context $z_j$. The future contexts can be
+waypoints, obstacle cases, tactile thresholds, shared-autonomy states, or
+representative scenes selected by a validation protocol.
 
 \begin{definition}[Minimum Effective Correction]
-Given a correction cost matrix $W \succ 0$, the Minimum Effective Correction is
+Given a positive definite correction-cost matrix $W\succ0$, the Minimum
+Effective Correction is
 \begin{equation}
-    c^\star = \arg\min_c \|c\|_W^2
-    \quad \textrm{s.t.} \quad
-    m_j(U(\theta,\tau,c)) \geq \gamma, \quad \forall z_j \in \mathcal{Z}.
+    c^\star =
+    \arg\min_c \|c\|_W^2
+    \quad \textrm{s.t.}\quad
+    m_j(U(\theta,\tau,c))\ge \gamma,\quad \forall z_j\in\mathcal{Z}.
+    \label{eq:mec}
 \end{equation}
-If no feasible $c$ exists inside the physical correction channel, the learner cannot certify the requested future behavior from this interface at this state.
+If no feasible $c$ exists inside the modeled physical correction channel, the
+interface cannot certify the requested future behavior at this state.
 \end{definition}
 
-The definition is intentionally learner-relative. It does not say that the task is impossible, that the human is wrong, or that no other teaching interface would work. It says only that the current robot update map cannot turn this kind of physical correction into the requested future behavior.
+The definition is intentionally learner-relative. Infeasibility does not say the
+task is impossible, the human is mistaken, or no teaching method can work. It
+says the present interface and learner update cannot certify the requested
+future behavior from the available correction coordinates. This is a useful
+diagnostic: the right response may be a different teaching interface, richer
+future contexts, better features, tactile sensing, or explicit preference
+queries.
 
-\section{Update-Boundary Correction}
-UBC solves the local version of MEC. Linearize the update around $c=0$:
+\paragraph{Local model.}
+UBC uses the local affine approximation
 \begin{equation}
     U(\theta,\tau,c) \approx \theta + Jc,
 \end{equation}
-where $J = \partial U / \partial c$ is the correction-to-update channel. Linearize future margins as
+where $J=\partial U/\partial c$ is the correction-to-update channel. Linearizing
+future margins gives
 \begin{equation}
-    m_j(\theta + Jc) \approx a_j^\top \theta + a_j^\top Jc - b_j.
+    m_j(\theta+Jc) \approx a_j^\top \theta + a_j^\top Jc - b_j.
 \end{equation}
 Stacking rows yields
 \begin{equation}
-    Hc \geq h, \quad H = AJ,\quad h = b + \gamma\mathbf{1} - A\theta.
+    Hc\ge h,\quad H=AJ,\quad h=b+\gamma\mathbf{1}-A\theta.
+    \label{eq:channel}
 \end{equation}
-UBC solves
-\begin{equation}
-    c^\star = \arg\min_c \|c\|_2^2 \quad \textrm{s.t.} \quad Hc \geq h.
-    \label{eq:ubc}
-\end{equation}
+The matrix $H$ is the object that determines whether physical corrections can
+change the chosen future behaviors.
 
-\begin{proposition}[Local certificate]
-For the affine update and linear margin model above, Equation~\ref{eq:ubc} returns the unique minimum Euclidean-norm physical correction whenever the feasible set is nonempty. If the feasible set is empty, no physical correction in the modeled channel can certify all specified future margins. Any component in $\mathrm{Null}(H)$ leaves all certified future margins unchanged.
+\paragraph{Reachability.}
+A future request is reachable if the halfspace system $Hc\ge h$ has a solution
+within the physical correction cap. It is unreachable if no such correction
+exists. The cap may represent force limits, human comfort, safety, or actuator
+limits. In this paper, unreachable examples are not treated as failures of the
+human. They are diagnostic outputs of the robot interface.
+
+\section{Update-Boundary Correction}
+
+UBC solves the local MEC problem
+\begin{equation}
+    c^\star = \arg\min_c c^\top W c
+    \quad\textrm{s.t.}\quad Hc\ge h.
+    \label{eq:weighted}
+\end{equation}
+The Euclidean case is $W=I$. The weighted case captures anisotropic interfaces:
+some directions may be more uncomfortable, less safe, or harder to command.
+
+\begin{proposition}[Local correction certificate]
+For the affine update and linear margin model in Equation~\ref{eq:channel}, if
+$W\succ0$ and the feasible set $C=\{c:Hc\ge h\}$ is nonempty and closed, then
+Equation~\ref{eq:weighted} has a unique minimizer. This minimizer is the
+minimum-cost physical correction for the modeled channel. If $C$ is empty, no
+correction in the modeled channel can certify all specified future margins.
 \end{proposition}
 
-\textit{Proof sketch.} The feasible set is an intersection of halfspaces and is therefore convex. Projecting the origin onto a nonempty closed convex set has a unique Euclidean projection. Infeasibility means the halfspaces have empty intersection in the correction coordinates. Finally, if $v \in \mathrm{Null}(H)$, then $H(c+v)=Hc$, so $v$ can change the physical motion without changing the certified future margins. A fuller proof is in Appendix~\ref{app:proof}.
+\paragraph{Algorithm.}
+For the small correction dimensions used here, UBC is implemented by exact
+active-set enumeration in low-dimensional cases and by a deterministic
+constrained quadratic solve in higher-dimensional cases. The implementation is
+not the contribution; the contribution is the diagnostic variable and the
+interpretation of feasibility, nullspace, and cost. The same objective can be
+solved by off-the-shelf QP solvers in a robot stack.
 
-\section{Experiments}
-We construct a compact embodied-correction environment that isolates the assumption under test. Each trial samples a future-margin/update map $H=AJ$ and required margin vector $h$. Reachable trials are generated from a hidden feasible physical correction. Unreachable trials contain contradictory constraints in the correction channel. Methods receive only $H$ and $h$.
+\paragraph{Nullspace warnings.}
+If $v\in\mathrm{Null}(H)$, then $H(c+v)=Hc$ for every candidate correction $c$.
+Thus $v$ can change the physical motion, contact force, or immediate compliance
+without changing any certified future margin. Nullspace directions are where
+current repair and future learning most visibly diverge.
 
-\textbf{Methods.} UBC solves Equation~\ref{eq:ubc} exactly by active-set enumeration in the three-dimensional correction space. Current-only applies the minimum correction for the first margin only. Single-axis current uses the largest current-margin coordinate, modeling a teacher or interface that corrects one salient physical direction. Gradient line search moves along the aggregate violated-margin gradient. Random search samples feasible corrections under the physical norm cap.
+\begin{proposition}[Learning-null effort]
+Let $v\in\mathrm{Null}(H)$. For every feasible correction $c$, the correction
+$c+v$ has identical modeled future margins and weakly larger cost when
+$v^\top W c\ge 0$. In particular, if $c$ is the $W$-orthogonal projection onto
+the feasible set, then adding any nonzero $W$-orthogonal nullspace component is
+strictly wasteful for the certified future behaviors.
+\end{proposition}
 
-\textbf{Metrics.} We report future success on reachable trials, detection of unreachable trials, and physical norm on successful reachable trials. Future success requires all future margins to be satisfied, not only the current interaction.
+\paragraph{Estimated channels.}
+In deployment, the robot may have only an estimate $\hat H$. If UBC solves
+$\hat Hc\ge h$ but the true future margins use $H$, false certificates are
+possible. A simple guard solves $\hat Hc\ge h+\rho\mathbf{1}$; this can reduce
+false certificates, but it gives up exact minimum correction. The full-scale
+experiments quantify this tradeoff.
+
+\paragraph{Nonlinear recentering.}
+When the local linear model is only approximate, a correction can satisfy
+$Hc\ge h$ but fail the true nonlinear margins. We evaluate a trust-recentered
+variant that uses a smaller local radius and a guard to mimic one-step online
+validation. It is not claimed to solve nonlinear robot learning; it shows how
+the certificate should degrade when the local approximation is stressed.
+
+\section{Full-Scale Experimental Design}
+
+The v3 suite is synthetic by design. It isolates the correction-channel
+mechanism without confounding it with hardware sensing, user modeling, or
+learned high-dimensional policies. Each trial samples a future-margin/update
+matrix $H$, a required margin vector $h$, and sometimes an estimated channel
+$\hat H$ or nonlinear true margin. Reachable trials are generated from a hidden
+feasible correction and then solved without revealing that correction to the
+method. Unreachable trials contain contradictory or rank-deficient future
+constraints.
+
+\paragraph{Families.}
+Family A sweeps future-context coverage, correction dimension, nullspace
+probability, and baselines. Family B stresses estimated update channels with
+noise, scale bias, finite-sample quality, and guard margins. Family C evaluates
+nonlinear locality and trust-recentered correction. Family D changes the
+physical cost metric. Family E compares stronger correction-learning baselines.
+Family F measures infeasibility and nullspace diagnostics. Family G adds
+manipulator-inspired synthetic tasks. Family H performs ablations and negative
+controls.
+
+\paragraph{Metrics.}
+For reachable requests, we report future success, current-margin success,
+physical norm, false certificates, rank, and nullspace dimension. For
+unreachable requests, we report detection. A false certificate means the method
+returns a correction that appears valid to its internal model but fails the true
+future margins. This metric is crucial for estimated-channel and nonlinear
+settings.
+
+\paragraph{Baselines.}
+The suite includes current-only correction, one-axis current correction,
+aggregate-gradient line search, random feasible search, least-squares repair,
+soft margin-penalty repair, sequential greedy repair, reward-gradient correction,
+coactive-style direction correction, robust guarded UBC, safe large guard, wrong
+cost metrics, random future contexts, and oracle anchors. These baselines are
+not intended to exhaust all preference-learning systems; they are stress
+probes for the estimand.
+
+\paragraph{RAM-light implementation.}
+The runner writes summary rows and generated artifacts, not full dense matrices
+for every trial. Families run sequentially, and progress is written to
+\path{results/full_scale/progress.json}. The final package contains 2,426
+seed-row summaries, eight figures, nine tables, metadata, and a report.
 
 \begin{table}[t]
 \centering
-\caption{Runnable simulated evidence. Rates are percentages except norm.}
-\begin{tabular}{lccc}
-\toprule
-Method & Future success & Unreachable detected & Mean norm \\
-\midrule
-UBC (ours) & 100.0 & 100.0 & 0.617 \\
-Current-only & 0.0 & 0.0 & -- \\
-Single-axis current & 0.6 & 0.0 & 0.463 \\
-Gradient line search & 64.0 & 100.0 & 1.019 \\
-Random search & 100.0 & 100.0 & 1.174 \\
-\bottomrule
-\end{tabular}
-\label{tab:results}
+\caption{Runtime and artifact scope of the v3 suite. Seed rows are compact
+summary rows, not full dense trial archives.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_runtime_memory.tex}}
+\label{tab:runtime}
 \end{table}
 
+\section{Results}
+
+\subsection{Future-Context Coverage}
+
+The main question is whether current repair and future learning diverge when the
+robot is judged on multiple future contexts. Table~\ref{tab:main} answers yes.
+UBC obtains 1.000 future success on reachable requests and detects 1.000 of
+unreachable requests. Current-only and one-axis current corrections have small
+physical norms but zero future success. Random search reaches 0.981 success but
+uses much larger corrections, with a mean norm of 1.330 versus 0.589 for UBC.
+
 \begin{table}[t]
 \centering
-\caption{V2 estimated-channel stress. UBC and guarded UBC solve with a noisy
-estimated update channel $\hat H$ and are evaluated on the true future margins.}
-\label{tab:channel-noise}
-\input{../experiments/channel_noise_table.tex}
+\caption{Main future-context coverage setting. Future success is measured on
+reachable requests; unreachable detection is measured on contradictory requests.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_main_context_coverage.tex}}
+\label{tab:main}
 \end{table}
 
 \begin{figure}[t]
 \centering
-\begin{minipage}{0.48\linewidth}
-\centering
-\includegraphics[width=\linewidth]{figures/success_rates.png}
-\end{minipage}
-\begin{minipage}{0.48\linewidth}
-\centering
-\includegraphics[width=\linewidth]{figures/correction_norms.png}
-\end{minipage}
-\caption{Left: future success and unreachable detection. Right: physical correction norm on successful reachable trials.}
-\label{fig:results}
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_main_context_coverage.pdf}
+\caption{Main method comparison. Immediate repair baselines can be small while
+failing the future-context set.}
+\label{fig:main}
 \end{figure}
 
-The result is the intended stress test. Current-only corrections can satisfy the immediate margin while failing the future-context set. UBC succeeds on reachable local problems because it solves the exact projected halfspace problem; on contradictory problems it reports infeasibility. This is not evidence that UBC is a complete robot teacher. It is evidence that the distinction between current repair and future-behavior change is operational and measurable.
+The oracle anchor is feasible but not minimum. Its norm is larger than UBC
+because the hidden generation anchor is simply a witness of reachability, not
+the projection of the origin onto the feasible set. This distinction is useful:
+even when a human demonstration or hidden correction proves a target is
+reachable, MEC asks for the smallest physical correction that reaches it.
 
-Table~\ref{tab:channel-noise} attacks the strongest hidden assumption: the robot must
-know the local update channel. If UBC optimizes against $\hat H=H+\eta$ but the true
-future margins are checked under $H$, the tight minimum-norm certificate becomes brittle.
-At $\sigma=0.10$, unguarded success is 0.330. Adding a small uniform margin guard raises
-success to 0.750, but it changes the object from minimum correction to a more conservative
-correction. Thus UBC is exact for the modeled channel, not automatically robust to
-Jacobian-estimation error.
+\subsection{Estimated Update Channels}
+
+Table~\ref{tab:channel} attacks the strongest hidden assumption: the robot must
+know the update channel. At $\sigma=0.10$ in the scale-matched,
+32-sample-quality slice, unguarded estimated-channel UBC succeeds in only 0.344
+of reachable cases and produces false certificates in 0.656. A guard of one
+noise unit raises success to 0.906 and lowers false certificates to 0.094, but
+the mean norm rises from 0.627 to 0.748. This is the expected tradeoff. Guarding
+makes the correction more conservative and therefore no longer exactly minimum
+for the estimated channel.
+
+\begin{table}[t]
+\centering
+\caption{Estimated update-channel stress. The method solves on $\hat H$ and is
+evaluated on true margins under $H$.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_channel_stress.tex}}
+\label{tab:channel}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_channel_stress.pdf}
+\caption{Guard margins trade physical effort for fewer false certificates under
+estimated update channels.}
+\label{fig:channel}
+\end{figure}
+
+This result narrows the claim. UBC is not a magic correction rule under noisy
+Jacobians. Its certificate is exact for the channel it is given. If the channel
+is wrong, the robot needs guard margins, validation, recentering, or a better
+estimator.
+
+\subsection{Nonlinear Locality}
+
+The linear model is another boundary. Family C evaluates true margins that
+include curvature penalties. Table~\ref{tab:nonlinear} shows that the raw
+linear certificate can be maximally brittle: at curvature 0.20, linear UBC has
+0.000 true success and a 1.000 false-certificate rate. A trust-recentered
+variant reaches 0.817 success at larger norm. The right interpretation is not
+that the recentered variant solves nonlinear correction. It shows that local
+certificates must be paired with locality control.
+
+\begin{table}[t]
+\centering
+\caption{Nonlinear locality stress. The linear certificate is evaluated under
+true nonlinear margins; the trust-recentered variant is a conservative local
+validation proxy.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_nonlinear_locality.tex}}
+\label{tab:nonlinear}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_nonlinear_locality.pdf}
+\caption{Curvature exposes false certificates. Locality control recovers part
+of the success rate by paying additional norm.}
+\label{fig:nonlinear}
+\end{figure}
+
+\subsection{Interface Cost}
+
+Minimum correction depends on the cost metric. Family D compares Euclidean UBC,
+matching weighted UBC, and a wrong-cost UBC under several interface models.
+Anisotropic force, joint limits, comfort weights, and sparse contact channels
+change the direction of the correction. This is not a cosmetic detail. If the
+robot uses the wrong cost, it can return a correction that is mathematically
+minimum in Euclidean distance while being expensive or uncomfortable in the
+actual interface.
+
+\begin{table}[t]
+\centering
+\caption{Interface-cost stress. Matching the physical effort metric changes the
+minimum correction direction and weighted norm.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_interface_cost.tex}}
+\label{tab:cost}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_interface_cost.pdf}
+\caption{Weighted cost exposes a second boundary: the minimum correction is
+metric-relative, not only channel-relative.}
+\label{fig:cost}
+\end{figure}
+
+\subsection{Stronger Baselines}
+
+Family E compares UBC against stronger correction-learning probes. Robust UBC
+and safe large guard reach 1.000 future success but use larger corrections.
+Sequential greedy repair and reward-gradient correction can improve over
+current-only baselines, yet they remain below UBC and often spend more norm.
+Coactive-style and margin-penalty directions produce false certificates because
+they move in plausible improvement directions without solving the future
+boundary system.
+
+\begin{table}[t]
+\centering
+\caption{Stronger correction-learning baselines. Guarded variants can match
+success by paying norm; direction-only methods can produce false certificates.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_strong_baselines.tex}}
+\label{tab:baselines}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_strong_baselines.pdf}
+\caption{Baselines that do not solve the projected future-boundary problem can
+repair the present while missing the future set.}
+\label{fig:baselines}
+\end{figure}
+
+\subsection{Infeasibility And Nullspace Diagnostics}
+
+Family F makes the diagnostic output explicit. UBC reports infeasibility on
+contradictory future-margin sets. Current-with-null-effort can waste physical
+motion in low-rank directions that do not change future margins. The nullspace
+effort plot shows that effort can grow in directions that are physically
+nonzero but learning-null. That is the central diagnostic value: a robot can
+tell the user that the interface is not informative for the intended future
+change.
+
+\begin{table}[t]
+\centering
+\caption{Infeasibility and nullspace diagnostics. Contradictory requests should
+be rejected; nullspace effort should not be counted as future-effective
+correction.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_infeasibility_nullspace.tex}}
+\label{tab:nullspace}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_infeasibility_nullspace.pdf}
+\caption{Learning-null physical effort appears when the correction interface has
+low rank with respect to the future margins.}
+\label{fig:nullspace}
+\end{figure}
+
+\subsection{Manipulator-Inspired Synthetic Tasks}
+
+Family G adds structure without claiming hardware. The tasks mimic planar
+pushing, shared-autonomy waypoint correction, force/tactile thresholds, and
+peg-in-hole compliance. UBC and weighted UBC remain strong in these structured
+synthetic settings. Estimated guarded variants degrade in the force/tactile and
+peg-compliance cases, which is expected because those cases deliberately include
+anisotropic and low-rank channels.
+
+\begin{table}[t]
+\centering
+\caption{Manipulator-inspired synthetic tasks. These are structured diagnostics,
+not hardware experiments.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_embodied_tasks.tex}}
+\label{tab:embodied}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_embodied_tasks.pdf}
+\caption{Structured synthetic tasks preserve the central pattern while exposing
+estimated-channel and cost-metric boundaries.}
+\label{fig:embodied}
+\end{figure}
+
+\subsection{Ablations}
+
+Family H removes pieces of the mechanism. Full UBC succeeds and detects
+unreachable requests. Removing future contexts collapses to current-only
+behavior. Random future contexts do not certify the intended future set. Using
+an estimated channel without guard produces false certificates. Applying a guard
+direction without update-channel projection is not enough.
+
+\begin{table}[t]
+\centering
+\caption{Ablations and negative controls. The future context set, update-channel
+projection, and true-channel certificate are all necessary pieces.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_ablation.tex}}
+\label{tab:ablation}
+\end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.82\linewidth]{../results/full_scale/figure_ablation.pdf}
+\caption{Ablations show that current repair, random contexts, and unguarded
+estimated channels do not recover the mechanism.}
+\label{fig:ablation}
+\end{figure}
+
+\section{Discussion}
+
+\paragraph{What the positive result means.}
+The positive result is not that a simple QP is a complete robot teaching system.
+It is that the correction should be evaluated in the learner's future-behavior
+coordinates. When $H$ is trusted, the projected halfspace problem tells the robot
+which physical correction is minimally effective, which requests are unreachable
+through the current interface, and which directions are learning-null.
+
+\paragraph{What the negative results mean.}
+The negative results are as important as the positive ones. Estimated channels
+produce false certificates unless guarded. Nonlinear curvature breaks the raw
+local certificate. Wrong cost metrics return corrections that are minimum in the
+wrong physical units. Random context sets can certify the wrong future. These
+are not implementation footnotes; they are the boundaries of the MEC claim.
+
+\paragraph{How a robot should use the diagnostic.}
+A deployed robot should not simply return $c^\star$ and trust it blindly. It
+should also report the rank of the future-margin channel, the active future
+contexts, the guard margin used for an estimated channel, the predicted margin
+after correction, and whether the request is unreachable. If the correction is
+near a nullspace direction, the robot should ask for a different teaching
+modality or a more informative future-context set.
 
 \section{Limitations}
-The guarantee is local to the affine update and linearized future-margin model. The finite context set $\mathcal{Z}$ is chosen by the designer and may miss deployment cases. The correction cost is Euclidean in the simulator rather than biomechanical. The experiments are abstract and do not include hardware contact, tactile sensing, or a high-dimensional policy. These limitations are central to the paper's honest scope: MEC is a formal object and UBC is a local certificate, not a universal account of human teaching.
-The v2 estimated-channel stress adds a sharper boundary: if the update Jacobian is noisy,
-the exact local certificate can fail on the true margins unless extra guard margins or
-online validation are added.
+
+The evidence is synthetic. There is no hardware robot, no real tactile data, no
+learned high-dimensional policy, and no user study. The future context set is
+designer-specified. The update channel is either trusted or synthetically
+estimated. The nonlinear stress is a controlled model of curvature, not a real
+policy-learning failure. The cost metrics are stylized rather than biomechanical.
+
+These limitations are not incidental; they are the claim boundary. The paper is
+ready as a mechanism/counterexample submission. It should not be presented as a
+robotics systems result. A stronger systems paper would need learned update
+Jacobians, real physical corrections, richer policy classes, and a context
+selection protocol that is not hand-authored.
 
 \section{Conclusion}
-Physical correction papers often conflate immediate repair with future robot learning. Minimum Effective Correction separates them. By projecting physical effort through the robot's update channel, UBC identifies the smallest correction that can change future behavior under a local model, and it exposes when the interface cannot provide such a correction. The mechanism is small, but the shift is sharp: the central question becomes not only what the human intended, but what the robot learner can actually absorb.
+
+Physical correction papers often conflate immediate repair with future robot
+learning. Minimum Effective Correction separates them. By projecting physical
+effort through the robot's update channel, UBC identifies the smallest
+correction that can change future behavior under a local model and exposes when
+the interface cannot provide such a correction. The full-scale synthetic suite
+supports the mechanism while also documenting the boundaries: estimated
+channels, nonlinear locality, cost metrics, nullspaces, and future-context
+coverage determine whether a correction is actually effective.
 
 \bibliographystyle{iclr2026_conference}
 \bibliography{references}
 
 \appendix
+
 \section{Proof Details}
 \label{app:proof}
-Consider $C=\{c:Hc\ge h\}$. If $C$ is nonempty, it is closed and convex. The function $f(c)=\frac12\|c\|_2^2$ is strongly convex, so it has at most one minimizer on $C$. Since $C$ is closed and $f$ is coercive, the minimizer exists. Therefore the solution of Equation~\ref{eq:ubc} is the unique minimum-norm correction in the local model.
 
-If $C$ is empty, then by definition there is no correction vector satisfying all local future-margin constraints. This is a statement about the current correction channel $H=AJ$, not about the task in general. A different learner, feature map, or teaching interface can change $H$.
+\subsection{Projection Proof}
 
-For the nullspace claim, let $v\in\mathrm{Null}(H)$. For any candidate correction $c$, the certified margin vector changes from $Hc-h$ to $H(c+v)-h=Hc-h$. Thus effort along $v$ may change contact geometry or compliance, but it cannot change the certified future margins under the modeled learner. This is the formal reason a visually meaningful physical correction can still be learning-irrelevant.
+Let $C=\{c:Hc\ge h\}$. If $C$ is nonempty, it is an intersection of closed
+halfspaces and is therefore closed and convex. Because $W\succ0$, the function
+$f(c)=\frac12 c^\top Wc$ is strongly convex and coercive. A coercive continuous
+function attains a minimum on a nonempty closed set, and strong convexity gives
+uniqueness. Thus Equation~\ref{eq:weighted} returns the unique minimum-cost
+correction in the local model.
+
+If $C$ is empty, then no correction vector satisfies the modeled future-margin
+constraints. This is a statement about the channel $H=AJ$ and context set
+$\mathcal{Z}$, not about the task in general. A different learner, feature map,
+future-context set, or teaching interface can change $H$ and therefore change
+reachability.
+
+\subsection{Weighted Transformation}
+
+Let $W=L^\top L$ with $L$ invertible. Setting $y=Lc$ gives $c=L^{-1}y$ and
+$c^\top Wc=\|y\|_2^2$. The constraint becomes $HL^{-1}y\ge h$. Thus the weighted
+problem is a Euclidean projection in transformed coordinates. The experiments
+use diagonal $W$, but the proof applies to any positive definite cost.
+
+\subsection{Nullspace Result}
+
+For any $v\in\mathrm{Null}(H)$, the modeled future margin vector after $c+v$ is
+$H(c+v)-h=Hc-h$. Thus future certification cannot distinguish $c$ and $c+v$.
+If $v$ is nonzero and $W$-orthogonal to the feasible projection direction, then
+$\|c+v\|_W^2=\|c\|_W^2+\|v\|_W^2>\|c\|_W^2$. This proves that nullspace effort is
+wasteful for the certified future margins even if it changes the current
+physical trajectory.
+
+\subsection{Channel-Error Bound}
+
+Suppose UBC solves $\hat Hc\ge h+\rho\mathbf{1}$ but the true channel is
+$H=\hat H+\Delta$. The true margin is
+\begin{equation}
+    Hc-h = \hat Hc-h+\Delta c.
+\end{equation}
+If $\|\Delta_i\|_2\le \epsilon$ for every row and $\|c\|_2\le r$, then each true
+margin is at least $\rho-\epsilon r$. Therefore a sufficient guard is
+$\rho\ge \epsilon r$. The condition is conservative because it uses a worst-case
+row bound, but it explains the empirical tradeoff in Table~\ref{tab:channel}:
+larger guards reduce false certificates by increasing the correction norm.
+
+\subsection{Nonlinear Locality}
+
+Let the true future margin be
+\begin{equation}
+    \tilde m_j(c)=H_jc-h_j+q_j(c),
+\end{equation}
+where $q_j(0)=0$ and $q_j$ has local curvature bounded by
+$|q_j(c)|\le \kappa \|c\|_2^2$. A linear certificate with slack $s_j=H_jc-h_j$
+is guaranteed only if $s_j\ge \kappa\|c\|_2^2$. Raw UBC often returns a point on
+the boundary with small slack, so curvature can create false certificates.
+Trust-region and recentering variants increase slack or reduce norm; they do
+not remove the need for local validation.
+
+\section{Algorithmic Details}
+
+\subsection{UBC Solver}
+
+For correction dimension at most three and modest future-context counts, the
+runner enumerates active sets. At a Euclidean projection onto a polyhedron in
+$\R^d$, the optimum has at most $d$ independent active halfspaces unless the
+origin is feasible. Enumerating active sets is therefore exact up to numerical
+tolerance in those cases. Higher-dimensional settings use a deterministic
+constrained quadratic solve through \texttt{scipy.optimize} with linear
+constraints. The paper does not depend on this solver choice.
+
+\subsection{Baseline Details}
+
+\paragraph{Current-only.}
+This baseline projects onto the first future margin only. It models a correction
+that repairs the present salient error but ignores the rest of the future
+context set.
+
+\paragraph{One-axis current.}
+This baseline chooses the largest coordinate of the first margin and corrects
+only that axis. It models a low-bandwidth interface or a teacher who can push
+along one obvious direction.
+
+\paragraph{Gradient line search.}
+This method moves along the aggregate violated-margin gradient and searches over
+step sizes up to the physical cap. It can work when all margins are aligned but
+spends norm inefficiently when constraints point in different directions.
+
+\paragraph{Random feasible search.}
+Random search samples correction directions inside the norm cap and keeps the
+smallest feasible candidate. It is a strong existence baseline but not an
+efficient minimum-correction method.
+
+\paragraph{Soft margin penalty.}
+This baseline optimizes a differentiable penalty for violations plus a norm
+penalty. It can return plausible directions while still failing exact future
+constraints.
+
+\paragraph{Sequential greedy repair.}
+This baseline cycles through violated constraints and projects onto one margin
+at a time. It is useful but order-dependent and not globally minimum.
+
+\paragraph{Robust and guarded variants.}
+Guarded UBC solves a stricter margin problem. It can improve true success under
+estimated channels, but the resulting correction is no longer the exact minimum
+for the unguarded local channel.
+
+\section{Parameter Grids}
+
+\subsection{Family A: Future-Context Coverage}
+
+Family A uses correction dimensions 2, 3, and 5; future context counts 3, 12,
+and 24; nullspace probabilities 0.0 and 0.5; six seeds per cell; and ten trials
+per seed. Reachable and unreachable requests are mixed so that future success
+and unreachable detection can be measured separately. The main table reports
+the $d=3$, 12-context, 0.5-nullspace-probability slice.
+
+\subsection{Family B: Estimated Channels}
+
+Family B uses additive channel noise
+$\sigma\in\{0.00,0.02,0.05,0.10,0.20,0.35\}$, multiplicative scales
+$0.75,1.00,1.25$, sample-quality values 8, 32, and 128, and guard multipliers
+0.0, 0.5, and 1.0. The table reports the scale-matched 32-sample slice because
+that is the cleanest view of guard behavior.
+
+\subsection{Family C: Nonlinear Locality}
+
+Family C uses curvature values 0.0, 0.05, 0.10, 0.20, and 0.40; norm caps 1.5,
+3.0, and 5.0; and three methods: raw linear UBC, guarded UBC, and
+trust-recentered UBC. The table reports the cap-3.0 slice.
+
+\subsection{Family D: Interface Cost}
+
+Family D uses isotropic, force-anisotropic, joint-limited, comfort-weighted, and
+sparse-contact costs. The matching weighted solver is compared against Euclidean
+UBC and wrong-cost UBC. This family supports the claim that ``minimum'' is a
+physical-interface statement, not merely a Euclidean one.
+
+\subsection{Family E: Strong Baselines}
+
+Family E compares UBC, robust UBC, safe large guard, sequential greedy repair,
+reward-gradient correction, coactive-style direction correction, and margin
+penalty descent. It mixes reachable and unreachable requests.
+
+\subsection{Family F: Infeasibility And Nullspace}
+
+Family F varies hidden nullspace dimension from 0 to 2 and includes both
+reachable and contradictory requests. It reports nullspace effort for baselines
+that can spend physical correction in learning-null directions.
+
+\subsection{Family G: Manipulator-Inspired Synthetic Tasks}
+
+Family G uses four structured synthetic tasks: planar pushing, shared-autonomy
+waypoint correction, force/tactile threshold correction, and peg-compliance
+correction. These tasks encode rank, anisotropy, and margin structure inspired
+by robotics, but they are not hardware experiments.
+
+\subsection{Family H: Ablations}
+
+Family H removes future contexts, replaces contexts with random rows, uses an
+estimated channel without guard, applies guard without update projection, uses a
+wrong cost, and compares against an oracle true channel.
+
+\section{Artifact Schema}
+
+All v3 artifacts live under \path{results/full_scale/}. Each family writes a
+seed CSV and a summary CSV. Figures are saved as both PDF and PNG. Tables are
+saved as small LaTeX \texttt{tabular} snippets and imported into the manuscript.
+The metadata file records the master seed, family names, headline values, and
+seed-row counts. The progress file records completion status and plot failures.
+
+\begin{table}[t]
+\centering
+\caption{Claim-to-evidence map generated by the runner.}
+\resizebox{\linewidth}{!}{\input{../results/full_scale/table_claim_evidence.tex}}
+\label{tab:claims}
+\end{table}
 
 \section{Reproducibility}
-The experiment can be rerun with:
+
+From the repository root:
 \begin{verbatim}
-python scripts/run_experiments.py
+python scripts\run_experiments.py
+python experiments\full_scale_minimum_intervention.py
 \end{verbatim}
-The literature matrix and synthesis documents can be regenerated with:
+Then build the manuscript from \path{paper/}:
 \begin{verbatim}
-python scripts/literature_pipeline.py
-python scripts/synthesize_docs.py
+bibtex main
+pdflatex -interaction=nonstopmode -halt-on-error main.tex
+pdflatex -interaction=nonstopmode -halt-on-error main.tex
 \end{verbatim}
+The v3 runner is deterministic under master seed 15015. The final paper should
+contain the version marker, generated figures, generated tables, and the
+headline numbers listed in \path{results/full_scale/metadata.json}.
+
+\section{Additional Interpretation}
+
+\subsection{Why Current Repair Fails}
+
+Current-only repair optimizes the first visible margin. That margin can be the
+present obstacle, current waypoint, or most salient tactile threshold. Future
+learning, however, is certified over a set of contexts. If the first row of $H$
+is not representative of the rows that matter later, then the current correction
+can be orthogonal to future learning. This is why current-only and no-future
+context ablations collapse in Tables~\ref{tab:main} and~\ref{tab:ablation}.
+
+\subsection{Why Random Search Is Not The Answer}
+
+Random search often finds feasible corrections in low-dimensional reachable
+sets, but it does not solve the minimum-correction problem. In the main setting,
+random search has high future success but uses 2.259 times the UBC norm. In
+robot teaching, that norm is not just a mathematical cost. It can mean extra
+force, user discomfort, longer physical intervention, or an unnecessarily large
+trajectory deviation.
+
+\subsection{Why Infeasibility Matters}
+
+Without an infeasibility output, a robot can keep asking for stronger physical
+corrections even when the current interface cannot encode the future concept.
+UBC changes the dialogue. It can say: this correction channel cannot move the
+specified future margins; please provide a different modality, a new example, a
+feature label, or a richer future-context set. This is especially important in
+shared autonomy, where takeovers may solve the current state but fail to teach
+future autonomy.
+
+\subsection{Why The Cost Metric Matters}
+
+The Euclidean metric is convenient for simulation, but physical correction has
+anisotropic costs. A human may be comfortable pushing laterally but not upward;
+a tactile correction may be cheap along a compliant axis and expensive along a
+stiff axis; a shared-control joystick may have different gains by direction. MEC
+therefore includes $W$ in its definition. Reporting only Euclidean norm hides
+the interface assumptions.
+
+\section{Worked Example}
+
+This section gives a concrete small example that illustrates why the MEC object
+differs from current repair. Consider a two-dimensional physical correction
+$c=(c_1,c_2)$. The current visible error is represented by the first row
+$H_1=(1,0)$ and required margin $h_1=0.2$. A current-only correction returns
+$c=(0.2,0)$ with norm 0.2. Now suppose the future context set also includes
+$H_2=(0,1)$ with $h_2=0.5$ and $H_3=(1,1)$ with $h_3=0.8$. The current-only
+correction satisfies the present row, but its future margins are
+$H_2c-h_2=-0.5$ and $H_3c-h_3=-0.6$. It is physically small because it optimizes
+the wrong feasible set.
+
+UBC instead solves the intersection of all three halfspaces. One feasible point
+is $c=(0.3,0.5)$, and the projection of the origin onto the polyhedron is the
+minimum correction under the chosen cost. The difference is not that UBC likes
+larger corrections. It is that the minimum is computed after specifying what the
+robot must learn for future contexts. The present correction is smaller only
+because it ignores future rows.
+
+Now add a learning-null direction. Let the physical correction be
+$c=(c_1,c_2,c_3)$ but let every future row have zero third component. A person
+can apply a large $c_3$ that changes the current contact force or trajectory
+shape. The future margin vector is unchanged because $H(c+\alpha e_3)=Hc$. In a
+real robot, this can correspond to pushing along a compliance direction that the
+learner does not encode, moving a waypoint in a feature that is not part of the
+reward, or applying tactile force that is filtered out by preprocessing. MEC
+does not call that effort useless in every sense; it calls it learning-null for
+the specified future predicates.
+
+Finally, consider an unreachable request. If the future set contains
+$H_1=(1,0)$ with $h_1=0.5$ and $H_2=(-1,0)$ with $h_2=0.5$, then no physical
+correction can satisfy both. A correction system without infeasibility detection
+may ask for a larger intervention. UBC instead reports that the current channel
+cannot certify the request. The correct next action is to change the context
+set, representation, teaching interface, or learner, not to demand more force.
+
+\section{Future-Context Selection Protocol}
+
+The guarantee in this paper is conditional on the finite context set
+$\mathcal{Z}$. This is a limitation, but it is also a design handle. A robot
+should not use a single current state as the only future context unless the
+deployment problem truly has no future variation. A practical context protocol
+should include at least five categories.
+
+\paragraph{Task-critical contexts.}
+These are states in which the corrected behavior is essential: obstacle
+approaches, grasp-precontact states, narrow passages, human-proximity states,
+or high-force tactile phases. If these contexts are absent, the correction can
+repair an easy state while failing the one that motivated the intervention.
+
+\paragraph{Near-boundary contexts.}
+Future margins near zero are the contexts where a small update can flip behavior.
+Sampling only easy positive or easy negative cases makes the halfspace problem
+look stable while missing decision boundaries. UBC is most informative when
+$\mathcal{Z}$ includes near-boundary examples.
+
+\paragraph{Diverse nuisance contexts.}
+The corrected behavior should be tested across irrelevant variations: object
+pose, approach side, speed, load, contact friction, or user command. These
+contexts prevent the correction from being effective only in the narrow current
+state.
+
+\paragraph{Counterfactual contexts.}
+Some future contexts should ask whether the correction changes the wrong
+behavior. For example, a correction meant to avoid a left obstacle should not
+make the robot avoid every goal on the left. Counterfactual contexts can expose
+overgeneralization.
+
+\paragraph{Interface-diagnostic contexts.}
+These contexts are chosen to reveal rank and nullspace problems in the physical
+correction channel. If adding them increases the rank of $H$, the robot learns
+that the original future set was underdiagnosed. If the rank remains low, the
+current interface may be structurally unable to teach the requested concept.
+
+Family A and Family H are synthetic versions of this protocol. Family A expands
+the number of future contexts and nullspace probabilities. Family H removes the
+future context set or replaces it with random contexts. The collapse of the
+no-future and random-context ablations demonstrates why context selection is not
+an afterthought. It is part of the correction certificate.
+
+\section{Estimated Update-Channel Protocol}
+
+A real robot rarely knows $J=\partial U/\partial c$ exactly. It may estimate the
+channel from finite differences, replay buffers, demonstrations, tactile
+responses, or learned local models. The deployment protocol should therefore
+separate three objects: the estimated channel $\hat H$, the validation channel
+used after a correction, and the guard policy used between them.
+
+\paragraph{Finite-difference estimation.}
+A simple procedure perturbs the correction interface along basis directions,
+applies the learner update, and measures changes in future margins. This yields
+a local estimate of each column of $H$. The procedure is expensive if physical
+rollouts are required, but it directly estimates the object UBC needs. It also
+reveals anisotropic uncertainty: some correction directions may be measured much
+more reliably than others.
+
+\paragraph{Model-based estimation.}
+If the learner update is differentiable, the robot can compute $J$ analytically
+or by automatic differentiation. The future margins still require a map $A$ from
+updated parameters to future behavior predicates. A differentiable planner or
+policy can provide this map locally, but discontinuous planners may require
+finite differences or smoothing.
+
+\paragraph{Replay estimation.}
+Corrections stored in a replay buffer can estimate the channel statistically.
+This is attractive because it avoids new perturbations, but it introduces
+selection bias: the buffer contains corrections humans chose under earlier
+policies, not necessarily directions needed now. Family B's scale and sample
+stresses are simple proxies for this issue.
+
+\paragraph{Guard selection.}
+A guard margin should depend on uncertainty and norm. The sufficient condition
+in the proof section suggests $\rho\ge \epsilon r$ under a rowwise error bound.
+In practice, the robot can estimate $\epsilon$ from validation residuals and
+choose $r$ from the proposed correction norm. Larger guards reduce false
+certificates but can reject reachable requests or increase effort.
+
+\paragraph{Online validation.}
+After proposing a correction, the robot should validate predicted future margins
+under a held-out context set or a recentered local model. If validation fails,
+the system should either increase the guard, recenter the linearization, or
+report uncertainty. The false-certificate metric in Families B and C is meant to
+force this behavior into the evaluation.
+
+\section{Nonlinear Validation Protocol}
+
+The local affine model is useful only near the correction point. A real robot
+should therefore treat UBC as a local proposal, not an unconditional global
+certificate. A practical validation loop has four steps.
+
+First, compute the minimum correction under the current linear model. Second,
+predict the future margins and active constraints. Third, simulate, roll out, or
+differentiate the updated policy at the proposed correction. Fourth, either
+accept the correction, add a guard, or recenter the local model around a smaller
+intermediate correction.
+
+The key quantity is not only success but certificate mismatch. A mismatch occurs
+when the linear model predicts all margins nonnegative but the true nonlinear
+evaluation fails. In Family C, the raw linear certificate has mismatch rate
+1.000 once curvature is nonzero in the reported slice. This intentionally harsh
+stress prevents the paper from overclaiming local theory as global behavior.
+The trust-recentered variant improves success by reducing the mismatch, but it
+still leaves false certificates at high curvature. That is the correct outcome:
+nonlinear validation helps, but does not remove the need for real model checks.
+
+This protocol also clarifies when UBC should refuse to return a crisp answer.
+If the local model changes rapidly across small recentering steps, the robot
+should report that the update channel is unstable. If the active future contexts
+change discontinuously, the context set may be near a planner mode switch. If
+the correction norm required for feasibility exceeds the locality radius, the
+robot should not claim a local certificate even if the QP is feasible.
+
+\section{Baseline Fairness Audit}
+
+The baselines are chosen to test different alternatives to the MEC estimand.
+They are not all equally strong optimizers, and the paper should be explicit
+about what each one can and cannot prove.
+
+\paragraph{Current repair baselines.}
+Current-only and one-axis current are intentionally weak for future behavior.
+Their role is to show that immediate repair is not sufficient. They should not
+be used as the only comparison in a final systems paper, but they are necessary
+negative controls for this mechanism paper.
+
+\paragraph{Search baselines.}
+Random search is a strong feasibility baseline in low-dimensional settings. If
+random search succeeds, then the feasible set exists and the question becomes
+minimum effort. In the main setting random search nearly matches success but
+uses more than twice the norm, supporting the minimum-correction claim.
+
+\paragraph{Gradient and penalty baselines.}
+Gradient line search and margin-penalty descent represent common relaxations:
+move in a plausible improvement direction, or penalize violations softly. These
+methods can produce useful corrections when margins are aligned, but they can
+also produce false certificates because they do not enforce every future
+boundary exactly.
+
+\paragraph{Guarded baselines.}
+Safe large guard and robust UBC are strong baselines because they solve stricter
+problems. They can match success under trusted channels, but their norms are
+larger. This is not a failure of those methods; it shows the tradeoff between
+minimum correction and conservative robustness.
+
+\paragraph{Oracle anchors.}
+The oracle anchor is a reachability witness, not a minimum correction. It proves
+that the trial was generated with a feasible hidden correction. UBC often finds
+a smaller correction than the anchor, demonstrating that witness feasibility and
+minimum effectiveness are different objects.
+
+\section{Structured Task Details}
+
+The manipulator-inspired family is deliberately synthetic, but each task encodes
+a robotics pattern.
+
+\paragraph{Planar pushing.}
+The correction has two coordinates, and future margins represent pushing
+directions that keep an object away from obstacle boundaries. This task has low
+rank problems only rarely, so UBC and weighted UBC tend to agree.
+
+\paragraph{Shared waypoint correction.}
+The correction has three coordinates, and margins represent future trajectory
+features after a shared-autonomy update. Some physical directions are
+overrepresented because joystick or waypoint interfaces often have asymmetric
+gains.
+
+\paragraph{Force/tactile threshold correction.}
+The correction has four coordinates. Later coordinates have lower update
+sensitivity and higher cost, representing tactile channels that are physically
+available but weakly encoded by the learner. This task stresses the difference
+between Euclidean and weighted costs.
+
+\paragraph{Peg-compliance correction.}
+The correction has five coordinates with deliberately low-rank components.
+Some force directions change compliance in the current insertion but do not
+alter future margins. This task is the structured analogue of the nullspace
+diagnostic.
+
+None of these tasks is hardware. Their purpose is to make the abstract channel
+model less sterile while preserving control over ground-truth reachability and
+false certificates.
+
+\section{Failure Taxonomy}
+
+The suite exposes recurring failure modes that a real system should report.
+
+\paragraph{False current sufficiency.}
+The current margin is fixed, but future margins remain negative. This is the
+dominant failure for current-only correction and no-future-context ablations.
+
+\paragraph{False channel certificate.}
+The estimated channel says the correction is feasible, but the true channel
+does not. This is the main failure in Family B. Guarding reduces the rate by
+paying norm.
+
+\paragraph{False local certificate.}
+The linear model says the correction is feasible, but nonlinear validation
+fails. This is the main failure in Family C. Trust recentering helps but does
+not eliminate it.
+
+\paragraph{Wrong metric minimum.}
+The correction is minimum under the wrong effort model. This failure does not
+necessarily reduce success, but it changes human cost and therefore changes the
+meaning of "minimum."
+
+\paragraph{Nullspace waste.}
+The correction has components that do not affect future margins. This is
+especially likely in low-rank tactile or compliance interfaces.
+
+\paragraph{Context misspecification.}
+The correction certifies the wrong future set. Random contexts or missing
+counterfactual contexts can make an update appear effective while deployment
+contexts remain unsafe.
+
+\section{Reporting Checklist}
+
+A paper or robot system using MEC-style correction should report the following:
+
+\begin{itemize}
+\item the physical correction coordinates and cost matrix;
+\item the learner update channel or estimation method;
+\item the future context set and how it was selected;
+\item reachable future success and unreachable detection separately;
+\item false certificate rate under estimated or nonlinear channels;
+\item correction norm under the actual interface cost;
+\item rank and nullspace statistics of the composed channel;
+\item guard margins and validation protocol;
+\item ablations without future contexts and without update-channel projection;
+\item limitations on hardware, user intent, nonlinear global behavior, and
+context coverage.
+\end{itemize}
+
+The v3 artifact reports these quantities in synthetic form. A systems follow-up
+would need to report the same checklist on real correction data.
+
+\section{Reviewer Self-Attacks}
+
+\paragraph{This is just a QP.}
+The optimization is intentionally simple. The paper's claim is not that a small
+QP is algorithmically novel. The claim is that physical corrections should be
+evaluated through the future update channel, and that feasibility/nullspace
+diagnostics should be part of the robot's response.
+
+\paragraph{Synthetic evidence is not enough for robotics.}
+Correct for a systems claim. The paper is scoped as a mechanism and diagnostic
+paper. Hardware validation remains future work.
+
+\paragraph{Future contexts are hand selected.}
+Correct. The guarantee is conditional on $\mathcal{Z}$. A deployment system
+needs a context selection protocol. The paper makes this explicit and tests
+negative controls where random or incomplete contexts fail.
+
+\paragraph{The update channel may be unknown.}
+Correct. Family B is devoted to this failure. The result is not ``UBC is robust
+for free''; the result is that guards and validation are required when $H$ is
+estimated.
+
+\paragraph{Human intent is not inferred.}
+Correct. MEC assumes future predicates are specified. It is complementary to
+intent inference and preference learning, not a replacement for them.
+
+\section{Deployment Roadmap}
+
+A real robot implementation would need four additional pieces. First, it would
+need a learned or estimated update channel from physical correction to learner
+state. Second, it would need a future-context sampler tied to deployment risk.
+Third, it would need a cost model calibrated to the correction interface and
+human comfort. Fourth, it would need online validation after applying a
+correction. UBC can then serve as the local diagnostic inside a larger teaching
+system: propose the minimum effective correction when reachable, reject
+unreachable requests, and identify nullspace directions that cannot teach the
+future behavior.
+
+\section{Acceptance Criteria For A Real System}
+
+This mechanism paper should not be treated as a systems result until a real
+robot satisfies stronger acceptance criteria. The criteria below are written as
+a checklist because they are easy to blur in narrative form.
+
+\paragraph{Criterion 1: correction-channel calibration.}
+The robot must estimate the composed channel from physical correction to future
+margin. Reporting only a policy update loss is insufficient. The system should
+measure whether predicted margin changes match held-out future contexts after
+the physical correction is applied. A calibration curve should plot predicted
+margin improvement against realized margin improvement, with separate curves for
+small and large correction norms. If calibration error grows with norm, the
+robot should reduce the locality radius or recenter before claiming a
+certificate.
+
+\paragraph{Criterion 2: reachable and unreachable labels.}
+A benchmark should contain both reachable and unreachable correction requests.
+If every request is reachable, a method can avoid the diagnostic problem by
+always returning some correction. If no requests are unreachable, infeasibility
+detection cannot be evaluated. Unreachable labels do not require knowing that a
+task is impossible in the world; they require knowing that the chosen interface
+and learner cannot certify the requested future margins within the physical cap.
+
+\paragraph{Criterion 3: future-context holdout.}
+The contexts used to solve UBC should be separate from contexts used for final
+evaluation. Otherwise, a method can overfit the finite context set. The holdout
+set should include near-boundary cases, nuisance variations, and
+counterfactuals. The central metric should be future-context success on the
+holdout set, not current-state repair.
+
+\paragraph{Criterion 4: physical effort measured in the real interface.}
+The effort metric must match the interface. For kinesthetic teaching this may
+include force, torque, duration, and comfort. For shared autonomy it may include
+joystick displacement or takeover time. For tactile correction it may include
+contact pressure and direction. A method that is minimum in Euclidean feature
+space but uncomfortable in the physical interface has not solved MEC for the
+robot.
+
+\paragraph{Criterion 5: false certificate accounting.}
+Every estimated-channel or nonlinear experiment should report false
+certificates. A correction that is returned as feasible but fails true future
+margins is more dangerous than an explicit rejection, because it gives the user
+confidence that learning occurred. Family B and Family C include false
+certificate rates for exactly this reason.
+
+\paragraph{Criterion 6: interface redesign trigger.}
+If UBC repeatedly reports infeasibility or high nullspace dimension, the robot
+should change the teaching interface instead of repeatedly asking for larger
+corrections. This is a design criterion, not just a metric. The diagnostic is
+valuable only if the system acts on it.
+
+\section{Real-Robot Transition Design}
+
+The most direct hardware follow-up is not to deploy UBC on a high-dimensional
+policy immediately. A more controlled transition would use a manipulator with a
+small correction interface and a known update rule, then gradually remove
+assumptions.
+
+\paragraph{Stage 1: controlled waypoint learner.}
+The robot executes trajectories parameterized by a small waypoint or feature
+vector. A human physically corrects one segment. The learner updates waypoint
+features through a known or estimated linear map. Future contexts are held-out
+start-goal-obstacle configurations. This stage tests the core distinction
+between current repair and future policy margins while keeping the update
+channel interpretable.
+
+\paragraph{Stage 2: tactile threshold learner.}
+The robot performs contact-rich tasks with tactile thresholds, such as wiping,
+insertion, or sliding along a surface. Corrections are forces or impedance
+changes. The update channel maps force corrections into future threshold or
+impedance parameters. This stage tests anisotropic costs and nullspace effort,
+because some force directions are physically salient but weakly encoded by the
+learner.
+
+\paragraph{Stage 3: shared-autonomy intervention learner.}
+The user takes over a shared-control interface. The learner updates policy
+features from intervention segments. Future contexts are held-out autonomy
+states in which the learned policy should avoid similar failures. This stage
+tests whether UBC can explain when a takeover corrected the moment but failed to
+teach future autonomy.
+
+\paragraph{Stage 4: learned channel with online validation.}
+Only after the previous stages should the robot learn $H$ from data. The system
+should maintain uncertainty estimates, choose guard margins, and validate
+predicted future margins after correction. A meaningful comparison would report
+unguarded UBC, guarded UBC, robust UBC, preference-learning baselines, and
+current-only intervention learning on the same held-out future contexts.
+
+The stages are deliberately modest. They respect the current paper's evidence
+boundary while giving a path from mechanism to system. The first real-robot
+success criterion is not outperforming every correction-learning method. It is
+showing that the projected future-boundary diagnostic predicts when physical
+corrections actually change future autonomous behavior.
+
+\section{What Would Falsify The Mechanism}
+
+A useful mechanism paper should state what evidence would weaken it. Several
+outcomes would challenge the practical value of MEC.
+
+\paragraph{Current repair always predicts future success.}
+If, in a realistic correction benchmark, current-only repair were perfectly
+correlated with future-context success across diverse contexts, then the
+projection through $H$ would add little value. This would not disprove the math,
+but it would make the diagnostic unnecessary for that benchmark.
+
+\paragraph{The update channel is too unstable to estimate locally.}
+If small physical corrections produce discontinuous or high-variance future
+updates, then local UBC may be unusable without a different learner. The correct
+conclusion would be that the robot's correction interface is poorly conditioned,
+not that the user should push harder.
+
+\paragraph{Human cost is dominated by factors outside the model.}
+If comfort, fatigue, attention, or safety costs cannot be approximated by a
+useful local metric $W$, then minimum-correction claims should be weakened. The
+robot may still use UBC as a feasibility diagnostic, but not as a human-effort
+optimizer.
+
+\paragraph{Future contexts cannot be specified.}
+If the system cannot identify meaningful future predicates, then MEC lacks a
+target. In that case, intent inference, preference elicitation, or task
+specification must come first. UBC assumes future margins; it does not invent
+them.
+
+\paragraph{Alternative interfaces dominate.}
+If language feedback, demonstrations, or preference queries consistently provide
+lower-cost and more reliable future updates than physical corrections, then the
+robot should use those interfaces. MEC is learner-relative and interface-relative;
+it can diagnose that physical correction is the wrong teaching channel.
+
+\section{Submission Boundary And Reviewer Guidance}
+
+The v3 paper should be reviewed as a mechanism paper. Its main contribution is
+the distinction between physical correction size and future-effective correction
+size after the learner's update projection. It should not be reviewed as a
+hardware robot paper, a tactile sensing paper, or a new preference-learning
+architecture.
+
+The strongest positive evidence is the combination of exact local theory and
+wide synthetic stress. Family A verifies the main effect over future-context
+coverage. Family B shows estimated-channel fragility and guard tradeoffs. Family
+C prevents overclaiming local linear theory. Family D makes the cost metric
+explicit. Family E compares against stronger correction-learning probes. Family
+F tests infeasibility and nullspace diagnostics. Family G adds embodied
+structure without pretending to be hardware. Family H shows that removing future
+contexts or update-channel projection breaks the mechanism.
+
+The strongest remaining weakness is the absence of real robot validation. The
+paper should therefore avoid phrases such as ``solves physical correction'' or
+``teaches future behavior'' without the qualifier ``under the modeled local
+channel.'' The submission-safe version is: UBC gives a local certificate for
+whether a physical correction can change specified future margins through the
+robot's update channel, and it exposes when current repair is not future
+learning.
+
+\section{Artifact-To-Claim Audit}
+
+The repository artifacts are organized so that each claim in the paper can be
+checked against a generated file rather than only against prose. The main
+coverage claim is supported by
+\path{results/full_scale/family_a_context_coverage_seed.csv} and
+\path{results/full_scale/table_main_context_coverage.tex}. Those files support
+the statement that UBC solves reachable local future-context requests in the
+main setting and that current-only correction fails the future set. They do not
+support a claim about hardware, human comfort, or global nonlinear policies.
+
+The estimated-channel claim is supported by
+\path{results/full_scale/family_b_channel_seed.csv} and
+\path{results/full_scale/table_channel_stress.tex}. These artifacts support the
+statement that solving on $\hat H$ can produce false certificates and that guard
+margins trade norm for improved true-margin success. They do not prove that any
+particular real Jacobian estimator is accurate, nor do they identify the best
+guard policy for a robot.
+
+The nonlinear-locality claim is supported by
+\path{results/full_scale/family_c_nonlinear_seed.csv}. It supports the statement
+that a boundary-tight linear correction can fail under curved true margins and
+that recentering-style conservatism can recover part of the success rate. It
+does not support global nonlinear optimality.
+
+The cost-metric claim is supported by
+\path{results/full_scale/family_d_interface_cost_seed.csv}. It supports the
+statement that the word ``minimum'' is metric-relative. It does not provide a
+validated human biomechanics model. A real system must still calibrate $W$.
+
+The stronger-baseline claim is supported by
+\path{results/full_scale/family_e_strong_baselines_seed.csv}. It supports the
+statement that several plausible correction directions do not recover the full
+future-boundary certificate. It does not exhaust every preference-learning,
+inverse-reinforcement-learning, or shared-autonomy baseline.
+
+The infeasibility/nullspace diagnostic claim is supported by
+\path{results/full_scale/family_f_infeasibility_nullspace_seed.csv}. It supports
+the statement that contradictory future requests should be rejected and that
+low-rank channels can waste physical effort in learning-null directions. It does
+not claim that a rejected request is impossible for all teaching modalities.
+
+The embodied-structure claim is supported by
+\path{results/full_scale/family_g_embodied_seed.csv}. It supports the statement
+that the mechanism can be instantiated in manipulator-inspired synthetic
+settings. It does not claim real manipulation success.
+
+The ablation claim is supported by
+\path{results/full_scale/family_h_ablation_seed.csv}. It supports the statement
+that future contexts and update-channel projection are necessary ingredients in
+the synthetic suite. It does not prove that the exact same ablations would have
+the same magnitudes on hardware.
+
+This audit is intentionally conservative. The paper's evidence is strongest
+where the artifacts are directly generated from the local channel model. The
+paper's evidence is weakest where deployment would require perception,
+user-intent inference, learned update Jacobians, human effort models, and
+hardware contact dynamics.
+
+\section{Final Audit Paragraph}
+
+The full-scale runner completed with stage \texttt{complete}, 2,426 seed-row
+summaries, and zero plot failures. The manuscript imports generated v3 figures
+and tables from \path{results/full_scale/}. The final claim is local and
+learner-relative: UBC identifies minimum effective corrections for the modeled
+future-margin/update channel. The paper does not claim real-robot validation,
+global nonlinear optimality, solved human intent inference, or a learned
+high-dimensional tactile policy.
 
 \end{document}

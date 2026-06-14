@@ -1,11 +1,11 @@
 # Experiment Rigor Checklist
 
-- Fixed seeds: yes (`15` for the main experiment, `1515` for channel-noise stress).
-- Main trials: 600 total, 464 reachable, 136 intentionally unreachable.
-- Channel-noise stress: 6 noise levels x 100 reachable trials.
-- Main raw output: `experiments/episode_results.csv`.
-- Main summary: `experiments/summary.json`.
-- V2 stress output: `experiments/channel_noise_stress.csv`.
-- V2 manuscript table: `experiments/channel_noise_table.tex`.
-- Baselines: current-only, one-axis current, gradient line search, random search, UBC, guarded UBC in stress.
-- Remaining empirical gap: no hardware, no learned update Jacobian, no real human-correction interface, and no high-dimensional policy learner.
+- Fixed seeds: yes. v3 master seed is 15015.
+- RAM-light execution: yes. The runner stores summary CSVs, generated figures, generated tables, metadata, and progress JSON rather than full per-trial matrices.
+- v3 runner: `experiments/full_scale_minimum_intervention.py`.
+- v3 outputs: `results/full_scale/*.csv`, `results/full_scale/*.pdf`, `results/full_scale/*.png`, `results/full_scale/*.tex`, `results/full_scale/metadata.json`, and `results/full_scale/progress.json`.
+- Baselines: UBC, current-only, one-axis current, gradient line search, random search, least-squares repair, soft margin penalty, sequential greedy repair, reward-gradient correction, coactive direction, robust UBC, safe large guard, wrong-cost UBC, random contexts, and oracle true channel.
+- Stress axes: future-context count, correction dimension, nullspace probability, estimated-channel noise, scale bias, finite-sample quality, guard margin, nonlinear curvature, correction cap, interface cost metric, contradictory requests, structured task type, and ablations.
+- Metrics: reachable future success, unreachable detection, current success, false certificate rate, mean correction norm, min margin, rank, nullspace dimension, weighted norm, and nullspace effort.
+- Manuscript artifacts: generated v3 figures and LaTeX tables imported directly into `paper/main.tex`.
+- Remaining evidence gap: no hardware, no real tactile data, no high-dimensional learned policy, no user study, and no learned real update Jacobian.

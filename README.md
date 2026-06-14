@@ -4,46 +4,36 @@ This repository contains Paper 15 from the robotics/embodied-intelligence batch.
 
 ## Thesis
 
-The smallest useful physical robot correction is not necessarily the smallest displacement that fixes the current motion. It is the minimum-energy correction whose image through the robot learner's update channel crosses specified future-behavior decision boundaries.
+The smallest useful physical robot correction is not necessarily the smallest displacement that fixes the current motion. It is the minimum-cost correction whose image through the robot learner's update channel crosses specified future-behavior decision boundaries.
 
 ## Reproduce
 
 ```powershell
-python scripts/literature_pipeline.py
-python scripts/synthesize_docs.py
-python scripts/run_experiments.py
-python scripts/fetch_iclr_template.py
-python scripts/generate_paper.py
-```
-
-Build the paper from `paper/` with direct pdfLaTeX/BibTeX passes:
-
-```powershell
-pdflatex -interaction=nonstopmode -halt-on-error main.tex
+python scripts\run_experiments.py
+python experiments\full_scale_minimum_intervention.py
+cd paper
 bibtex main
 pdflatex -interaction=nonstopmode -halt-on-error main.tex
 pdflatex -interaction=nonstopmode -halt-on-error main.tex
 ```
 
-The final orchestrated PDF target is `C:/Users/wangz/Downloads/15.pdf`.
+The final verified PDF is `C:/Users/wangz/Downloads/15.pdf` (25 pages, 414,131 bytes, SHA256 `A3C35CED8E413B92C2DE1C58B54265EB3EBFCE4A46420AE65A23C31EAB2F66B9`).
 
-## Submission-Hardening v2
+## Submission-Hardening v3
 
-- Added estimated-update-channel stress in `experiments/channel_noise_stress.csv`.
-- The original 600-trial synthetic result is retained: UBC succeeds on 1.000 of reachable trials and detects 1.000 of unreachable trials under the trusted local channel.
-- With noisy channel estimates, unguarded UBC success drops to 0.330 at sigma 0.10 and 0.260 at sigma 0.20.
-- A simple guarded variant improves sigma 0.10 success to 0.750 and sigma 0.20 success to 0.600, but it gives up the exact minimum-correction interpretation.
-- Decision remains workshop-only until validated with learned update Jacobians, hardware corrections, and richer future-context sets.
+- Replaced the 5-page v2 artifact with a 25-page full-scale mechanism paper.
+- Added `docs/full_scale_execution_plan.md` before substantive v3 edits.
+- Added `experiments/full_scale_minimum_intervention.py`.
+- Generated eight experiment families and 2,426 seed-row summaries under `results/full_scale/`.
+- Main context setting: UBC future success 1.000, current-only future success 0.000, and random-search norm ratio 2.259.
+- Estimated-channel stress at sigma 0.10: unguarded success 0.344, guard-1.0 success 0.906.
+- Nonlinear curvature 0.20: raw linear UBC success 0.000, trust-recentered success 0.817.
+- Decision: ready as a full-scale mechanism/counterexample paper, not as a hardware robot or learned tactile-policy result.
 
-## Key artifacts
+## Key Artifacts
 
-- `docs/related_work_matrix.csv`: 1000-paper landscape matrix.
-- `docs/literature_map.md`: field map and sweep outcome.
-- `docs/hostile_prior_work.md`: 100-paper hostile prior-work set.
-- `docs/novelty_boundary_map.md`: novelty boundaries.
-- `docs/novelty_decision.md`: hidden assumptions and chosen direction.
-- `docs/claims.md`: supported and unsupported claims.
-- `docs/reviewer_attacks.md`: adversarial review notes.
-- `docs/final_audit.md`: final readiness audit.
-- `experiments/episode_results.csv`: runnable simulation results.
-- `figures/`: generated plots used in the paper.
+- `docs/full_scale_execution_plan.md`: v3 plan and acceptance checklist.
+- `docs/experiment_report.md`: generated full-scale experiment report.
+- `experiments/full_scale_minimum_intervention.py`: v3 experiment runner.
+- `results/full_scale/`: v3 CSV summaries, figures, tables, metadata, and progress log.
+- `paper/main.tex`: anonymous ICLR-style manuscript source.
