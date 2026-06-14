@@ -1,14 +1,26 @@
 # Submission Readiness Decision
 
-Decision: workshop-only / revise before main-conference submission.
+Decision: ready under mechanism/counterexample scope after v3 full-scale hardening.
 
-The paper has a crisp formal mechanism: corrections should be minimized after projection through the robot learner's update channel, not just by current-task displacement. The simulation is runnable and demonstrates the gap between immediate repair and future behavior change.
+The paper now has a full-scale evidence package for its central mechanism: physical corrections should be minimized after projection through the robot learner's update channel, because current repair and future behavior change can diverge.
 
-The paper is not main-conference-ready as a robotics systems result. It assumes the update channel is locally known and evaluates an abstract correction map rather than a physical robot or learned high-dimensional policy.
+Submission-safe claim:
 
-Minimum next evidence for a stronger submission:
+UBC gives a local certificate for whether a physical correction can change specified future margins through the robot's update channel. It returns a minimum-cost correction when reachable, and it exposes infeasibility, nullspace effort, and false certificates when the channel or future-context set is inadequate.
 
-- Estimate the update Jacobian from noisy robot correction data.
-- Evaluate on a manipulator or high-fidelity shared-autonomy task.
-- Add future-context selection protocols rather than designer-picked contexts.
-- Compare against stronger preference/correction learning baselines with learned features.
+Claims to avoid:
+
+- Do not claim hardware validation.
+- Do not claim global nonlinear optimality.
+- Do not claim learned tactile or high-dimensional update channels are solved.
+- Do not claim human intent is inferred.
+- Do not claim robustness to estimated channels without guard margins and validation.
+- Do not claim the finite future-context set covers all deployment contexts.
+
+Minimum next evidence for a systems paper:
+
+- Real or high-fidelity manipulator corrections.
+- Learned update-Jacobian estimates with held-out validation.
+- A future-context selection protocol tied to deployment risk.
+- Human effort or comfort calibration for the cost matrix.
+- Comparisons against deployed preference-learning, intervention-learning, and shared-autonomy systems.

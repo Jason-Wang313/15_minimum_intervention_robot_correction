@@ -1,27 +1,59 @@
 # Final Audit
 
-1. Chosen thesis: The smallest useful physical robot correction is the minimum-energy correction whose image through the robot's update channel crosses specified future-behavior decision boundaries, not merely the smallest displacement that fixes the current motion.
-2. Field assumption broken: Prior correction work often assumes that a physical correction which repairs the present execution is also a useful learning signal for future autonomous behavior.
-3. New central mechanism: Update-Boundary Correction: a local halfspace certificate that projects physical corrections through the robot learner's update Jacobian and returns the minimum effective correction, a nullspace warning, or an infeasibility certificate.
-4. Genuine novelty: The correction is defined by update reachability through the robot learner, so effort in the learner nullspace is explicitly separated from behavior-changing intervention. This is not a bigger model, more data, active learning, a verifier, or an LLM planner.
-5. Closest hostile prior work: learning from physical human corrections; reward learning from corrections; coactive/preference trajectory learning; shared autonomy; intervention-aided imitation learning; minimum-intervention control. See `docs/hostile_prior_work.md`.
-6. Literature coverage: 1000 entries in `docs/related_work_matrix.csv`; 300-paper serious skim, 225-paper deep-read slice, and 100-paper hostile set encoded by rank/stage. Template source: {'official_author_guide': 'https://iclr.cc/Conferences/2026/AuthorGuide', 'template_url': 'https://github.com/ICLR/Master-Template/raw/master/iclr2026.zip', 'downloaded': True, 'extracted': ['iclr2026_conference.bst', 'iclr2026_conference.sty'], 'warnings': []}.
-7. Proof/formal-claim status if any: Local convex optimality, infeasibility, and nullspace claims are proved for affine update and linearized future margins. No global nonlinear or hardware guarantee is claimed.
-8. Strongest evidence: UBC future success on reachable simulated trials 100.0%, unreachable detection 100.0%; current-only future success 0.0%. V2 channel-noise stress shows unguarded UBC success drops to 0.330 at update-channel noise sigma 0.10 and 0.260 at sigma 0.20, while guarded UBC reaches 0.750 and 0.600.
-9. Biggest weaknesses: simulated evidence only, finite future-context set, Euclidean correction cost, exact local update-channel assumption, local linearization, and no real robot hardware contact study.
-10. Paper-readiness judgment: workshop-only / revise before main-conference submission. The paper is coherent and runnable, but should be strengthened with learned update-Jacobian estimates, hardware correction data, or a richer robot planner before a main-conference submission.
-11. Exact Downloads PDF path: C:/Users/wangz/Downloads/15.pdf (263,370 bytes)
-12. GitHub URL: https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction (pushed by parent recovery; commit 6270272)
-13. Desktop copy status: copied by parent recovery to C:\Users\wangz\OneDrive\Desktop\15.pdf
+- Paper number: 15
+- Slug: `minimum_intervention_robot_correction`
+- Title: `Minimum Effective Corrections for Future Robot Behavior`
+- Terminal assessment: ready as a full-scale mechanism/counterexample paper under the stated claim scope
+- Audit date: 2026-06-14
 
-## Submission-Hardening v2
+## Required Outputs
 
-Checked: 2026-06-13 00:16:16 +01:00
+- Downloads PDF: `C:/Users/wangz/Downloads/15.pdf`
+- PDF size: 414,131 bytes
+- PDF pages: 25
+- SHA256: `A3C35CED8E413B92C2DE1C58B54265EB3EBFCE4A46420AE65A23C31EAB2F66B9`
+- Local build PDF after final copy: removed (`paper/main.pdf` does not exist)
+- Desktop PDF: no new Desktop copy created during v3 hardening
+- Source repository folder: `C:/Users/wangz/robotics_60_paper_batch/15_minimum_intervention_robot_correction`
+- GitHub repository: `https://github.com/Jason-Wang313/15_minimum_intervention_robot_correction`
 
-- Added estimated-update-channel stress tests and a manuscript table.
-- Original trusted-channel result retained: UBC future success on reachable trials 1.000; unreachable detection 1.000.
-- V2 boundary: unguarded UBC success under noisy estimated channels is 0.330 at sigma 0.10 and 0.260 at sigma 0.20.
-- V2 boundary: guarded UBC improves to 0.750 at sigma 0.10 and 0.600 at sigma 0.20, but gives up the exact minimum-correction interpretation.
-- Canonical v2 PDF: `C:/Users/wangz/Downloads/15.pdf` (263,370 bytes).
-- Terminal decision: workshop-only / revise before main-conference submission.
-- Desktop policy: no new Desktop copy created during v2 hardening.
+## Evidence Package
+
+- Full-scale plan: `docs/full_scale_execution_plan.md`
+- Full-scale runner: `experiments/full_scale_minimum_intervention.py`
+- Progress log: `results/full_scale/progress.json`
+- Metadata: `results/full_scale/metadata.json`
+- CSV summaries: `results/full_scale/family_*_summary.csv`
+- Seed rows: `results/full_scale/family_*_seed.csv`
+- Figures: `results/full_scale/figure_*.pdf` and `.png`
+- Tables: `results/full_scale/table_*.tex`
+- Experiment report: `docs/experiment_report.md`
+- Claims ledger: `docs/claims.md`
+- Readiness decision: `docs/submission_readiness_decision.md`
+
+## Build Verification
+
+- `python -m py_compile experiments\full_scale_minimum_intervention.py` passed.
+- `python experiments\full_scale_minimum_intervention.py` completed.
+- `bibtex main`, `pdflatex`, and final `pdflatex` completed.
+- Final local PDF before copy had 25 pages and 414,131 bytes.
+- Copied PDF in Downloads has 25 pages and 414,131 bytes.
+- `pdftotext` found the v3 manuscript marker and headline numbers in `C:/Users/wangz/Downloads/15.pdf`.
+- Downloads contains only one matching Paper 15 PDF: `15.pdf`.
+- Final log scan found no unresolved citations, undefined references, LaTeX errors, fatal stops, missing files, or overfull boxes.
+- Remaining benign warnings: underfull boxes from layout and MiKTeX update reminder.
+
+## Evidence Summary
+
+- Eight v3 experiment families completed.
+- Total v3 seed-row summaries: 2,426.
+- Plot failures: 0.
+- Main setting: UBC future success 1.000, current-only future success 0.000.
+- Random-search norm ratio: 2.259.
+- Estimated-channel sigma 0.10: unguarded success 0.344, guard-1.0 success 0.906.
+- Nonlinear curvature 0.20: raw linear UBC success 0.000, trust-recentered success 0.817.
+- Ablation: full UBC success 1.000, no-future-context success 0.008.
+
+## Claim Boundary
+
+The paper is submission-ready as a mechanism/counterexample paper. It does not claim hardware validation, learned tactile-policy deployment, global nonlinear optimality, solved human-intent inference, or robustness to noisy update channels without guards and validation.
