@@ -8,6 +8,8 @@ Submission-safe claim:
 
 UBC gives a local certificate for whether a physical correction can change specified future margins through the robot's update channel. It returns a minimum-cost correction when reachable, and it exposes infeasibility, nullspace effort, and false certificates when the channel or future-context set is inadequate.
 
+The 2026-06-20 export also matches the visible VLA-v4 boxed-link convention: green citation/URL boxes, red internal-reference boxes, one-point borders, and no cyan link boxes in the audited final PDF.
+
 Claims to avoid:
 
 - Do not claim hardware validation.

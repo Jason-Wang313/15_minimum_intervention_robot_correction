@@ -25,3 +25,12 @@ The v3 evidence package is synthetic and local. It isolates the paper's mechanis
 ## Interpretation
 
 The evidence supports a mechanism paper: UBC identifies minimum effective corrections for a modeled local channel and exposes current-repair failures, false certificates, nullspaces, and infeasibility. It does not support claims about real robot performance, learned Jacobians, human-intent inference, or tactile-policy deployment.
+
+## Final PDF
+
+- Path: `C:/Users/wangz/Downloads/15.pdf`
+- Pages: 25
+- Size: 414,131 bytes
+- SHA256: `DDDB3B1F90A4DB4E4470E531BA21407737A088B5A5A2B313F3FD8244F83E1E1F`
+- VLA-style boxed-link audit: 57 annotations on pages `[(1, 14), (2, 34), (4, 2), (5, 1), (6, 2), (14, 1), (15, 1), (17, 2)]`; green = 48, red = 9, cyan = 0; all borders `(0, 0, 1)`.
+- Visual audit: rendered pages 1, 2, 4, 5, 6, 14, 15, and 17 after export; citation/URL and internal-reference boxes are crisp and aligned.
