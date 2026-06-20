@@ -1,6 +1,6 @@
 # Submission Attack Log
 
-Checked: 2026-06-14
+Checked: 2026-06-20
 
 ## Hostile Round 1: The paper is too small and only proves a toy QP
 
@@ -31,3 +31,9 @@ Action: Added reward-gradient, coactive direction, margin-penalty, sequential gr
 Result: Claim narrowed.
 
 Action: README, claims, readiness decision, reviewer response, and manuscript limitations all state that this is not a hardware or learned tactile-policy result.
+
+## Hostile Round 6: PDF link styling may silently drift from the VLA role model
+
+Result: Incorporated.
+
+Action: Added explicit `\hypersetup` policy in `paper/main.tex`, rebuilt the final PDF, and verified 57 boxed link annotations: green = 48, red = 9, cyan = 0, all with border `(0, 0, 1)`. Rendered affected pages 1, 2, 4, 5, 6, 14, 15, and 17 and confirmed the boxes are visually crisp and aligned.

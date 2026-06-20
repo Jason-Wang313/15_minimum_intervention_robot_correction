@@ -4,14 +4,16 @@
 - Slug: `minimum_intervention_robot_correction`
 - Title: `Minimum Effective Corrections for Future Robot Behavior`
 - Terminal assessment: ready as a full-scale mechanism/counterexample paper under the stated claim scope
-- Audit date: 2026-06-14
+- Audit date: 2026-06-20
 
 ## Required Outputs
 
 - Downloads PDF: `C:/Users/wangz/Downloads/15.pdf`
 - PDF size: 414,131 bytes
 - PDF pages: 25
-- SHA256: `A3C35CED8E413B92C2DE1C58B54265EB3EBFCE4A46420AE65A23C31EAB2F66B9`
+- SHA256: `DDDB3B1F90A4DB4E4470E531BA21407737A088B5A5A2B313F3FD8244F83E1E1F`
+- VLA-style boxed-link audit: 57 link annotations on pages `[(1, 14), (2, 34), (4, 2), (5, 1), (6, 2), (14, 1), (15, 1), (17, 2)]`; colors green = 48, red = 9, cyan = 0; all borders `(0, 0, 1)`.
+- Visual link audit: pages 1, 2, 4, 5, 6, 14, 15, and 17 rendered after export; green citation/URL boxes and red internal-reference boxes are crisp and aligned.
 - Local build PDF after final copy: removed (`paper/main.pdf` does not exist)
 - Desktop PDF: no new Desktop copy created during v3 hardening
 - Source repository folder: `C:/Users/wangz/robotics_60_paper_batch/15_minimum_intervention_robot_correction`
